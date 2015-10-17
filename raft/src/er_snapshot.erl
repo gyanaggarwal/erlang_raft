@@ -19,11 +19,21 @@
 
 -module(er_snapshot).
 
--export([raft_snapshot/1]).
+-export([raft_snapshot/1, raft_log_entry/1, raft_vote/1]).
 
 -include("er_fsm.hrl").
 
 -spec raft_snapshot(AppConfig :: #er_app_config{}) -> {ok, #er_snapshot{}}.
 raft_snapshot(AppConfig) ->
+  RequestSnapshot = #er_snapshot{state_machine=?ER_REQUEST, log_entries=?ER_REQUEST, log_stats=?ER_REQUEST, voted_for=?ER_REQUEST},
+  er_util:read_snapshot(AppConfig, RequestSnapshot).
+
+-spec raft_log_entry(AppConfig :: #er_app_config{}) -> {ok, #er_snapshot{}}.
+raft_log_entry(AppConfig) ->
   RequestSnapshot = #er_snapshot{state_machine=?ER_REQUEST, log_entries=?ER_REQUEST, log_stats=?ER_REQUEST},
+  er_util:read_snapshot(AppConfig, RequestSnapshot).
+
+-spec raft_vote(AppConfig :: #er_app_config{}) -> {ok, #er_snapshot{}}.
+raft_vote(AppConfig) ->
+  RequestSnapshot = #er_snapshot{voted_for=?ER_REQUEST},
   er_util:read_snapshot(AppConfig, RequestSnapshot).

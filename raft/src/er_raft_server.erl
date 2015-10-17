@@ -35,7 +35,7 @@ start_link(AppConfig) ->
 init([AppConfig]) ->
   State = update_vote(#er_raft_state{app_config=AppConfig}),
   random:seed(erlang:phash2([node()]), erlang:monotonic_time(), erlang:unique_integer()),
-  {ok, State, get_timeout(State)}.
+  {ok, State, get_timeout(?ER_ENTRY_ACCEPTED, State)}.
 
 handle_call({?LOG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=State) ->
   event_state("log_entry.00", State),
@@ -50,7 +50,7 @@ handle_call({?LOG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=Sta
                            end,
   event_reply("log_entry.99", NewReply4),
   event_state("log_entry.99", NewState4),
-  {reply, NewReply4, NewState4, get_timeout(NewState4)};
+  {reply, NewReply4, NewState4, get_timeout(NewReply4, NewState4)};
 
 handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_NOT_IN_CONFIG}=State) ->
   event_state("config_entry.00", State),
@@ -72,7 +72,7 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_NOT_IN_C
                            end,
   event_reply("config_entry.99", NewReply2),
   event_state("config_entry.99", NewState2),
-  {reply, NewReply2, NewState2, get_timeout(NewState2)};
+  {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=State) ->
   event_state("config_entry.00", State),
   LogEntry = er_entry_util:make_log_entry(CmdEntry, State),
@@ -84,10 +84,18 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=
                                AppendEntries = er_entry_util:make_append_entries(?TYPE_CONFIG, LogEntry, State),
                                NewState = update_config(LogEntry, State),
                                NewReply = er_raft_peer_api:append_entries_config(CurrentConfigEntry, AppendEntries),
-                               NewReply1 = er_entry_util:make_reply(NewReply, NewState#er_raft_state.config, er_fsm_config:get_optimistic_mode(NewState#er_raft_state.app_config), true),
+                               NewReply1 = er_entry_util:make_reply(NewReply, NewState#er_raft_state.config, er_fsm_config:get_optimistic_mode(NewState#er_raft_state.app_config), false),
                                case NewReply1 of
                                  {ok, _}                                               ->
                                    {{ok, ?ER_CONFIG_CHANGE_ACCEPTED}, NewState#er_raft_state{config=#er_config{status=?ER_STABLE, current_config=LogEntry}}};
+                                 {?INSTALL_SNAPSHOT, {Replies1, InstallSnapshotNodes}}  ->
+                                   NewReply3 = process_install_snapshot(Replies1, InstallSnapshotNodes, NewState#er_raft_state.config#er_config.new_config, true, NewState),
+                                   case NewReply3 of
+                                     {ok, _} ->
+                                       {{ok, ?ER_CONFIG_CHANGE_ACCEPTED}, NewState#er_raft_state{config=#er_config{status=?ER_STABLE, current_config=LogEntry}}};
+                                     _       ->
+                                      {{error, ?ER_CONFIG_CHANGE_REJECTED}, State}
+                                    end;
                                  {error, {?ER_LEADER_STEP_DOWN, LeaderId, LeaderTerm}} ->
                                    {{error, {?ER_ENTRY_LEADER_ID, LeaderId}}, update_status_change(?ER_FOLLOWER, State#er_raft_state{leader_id=LeaderId, current_term=LeaderTerm})};
                                  {error, _}                                            ->
@@ -96,7 +104,7 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=
                            end, 
   event_reply("config_entry.99", NewReply2),
   event_state("config_entry.99", NewState2),
-  {reply, NewReply2, NewState2, get_timeout(NewState2)};
+  {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call({?PEER_REQUEST_VOTE, #er_request_vote{vote=Vote, config_entry=ConfigEntry}}, _From, #er_raft_state{status=Status}=State) when Status =/= ?ER_LEADER ->
   event_state("peer_request_vote.00", State),
@@ -104,7 +112,7 @@ handle_call({?PEER_REQUEST_VOTE, #er_request_vote{vote=Vote, config_entry=Config
   {NewReply2, NewState2} = process_vote(Vote, NewState),
   event_reply("peer_request_vote.99", NewReply2),
   event_state("peer_request_vote.99", NewState2),
-  {reply, NewReply2, NewState2, get_timeout(NewState2)};
+  {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
                                                          prev_log_term=EntryPrevLogTerm,
@@ -130,16 +138,25 @@ handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
                            end,  
   event_reply("peer_append_entries_op.99", NewReply4),
   event_state("peer_append_entries_op.99", NewState4),
-  {reply, NewReply4, NewState4, get_timeout(NewState4)};
+  {reply, NewReply4, NewState4, get_timeout(NewReply4, NewState4)};
 
-handle_call({?PEER_APPEND_ENTRIES_CONFIG, AppendEntries}, _From, #er_raft_state{status=?ER_NOT_IN_CONFIG}=State) ->
+handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderInfo}=AppendEntries}, _From, #er_raft_state{status=?ER_NOT_IN_CONFIG}=State) ->
   event_state("peer_append_entries_config.00", State),
   ConfigEntry = er_util:log_entry_lifo(AppendEntries),
   NewState2 = update_config(ConfigEntry, State),
-  NewReply2 = ?ER_ENTRY_ACCEPTED,
+  NewReply2 = case {LeaderInfo#er_leader_info.leader_id, 
+                   (NewState2#er_raft_state.prev_log_term =:= AppendEntries#er_append_entries.prev_log_term andalso 
+                    NewState2#er_raft_state.prev_log_index =:= AppendEntries#er_append_entries.prev_log_index)} of
+                {undefined, _} ->
+                  ?ER_ENTRY_ACCEPTED;
+                {_, true}      ->
+                  ?ER_ENTRY_ACCEPTED; 
+                {_, false}     ->
+                  ?ER_REQUEST_SNAPSHOT
+              end,
   event_reply("peer_append_entries_config.99", NewReply2),
   event_state("peer_append_entries_config.99", NewState2),
-  {reply, NewReply2, NewState2, get_timeout(NewState2)};
+  {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderInfo}}, _From, #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId, current_term=CurrentTerm}=State) when LeaderId =/= undefined ->
   event_state("peer_append_entries_config.00", State),
@@ -151,60 +168,50 @@ handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderI
                            end,
   event_reply("peer_append_entries_config.99", NewReply2),
   event_state("peer_append_entries_config.99", NewState2),
-  {reply, NewReply2, NewState2, get_timeout(NewState2)};
+  {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
-handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo, state_machine=StateMachineData, log_entries=LogEntries, log_entry_count=LogEntryCount, unique_id=UniqueId}}, _From, #er_raft_state{status=Status}=State) when Status =/= ?ER_LEADER ->
+handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo, 
+                                                  state_machine=StateMachineData, 
+                                                  log_entries=LogEntries, 
+                                                  voted_for=Vote}=Snapshot}, 
+            _From, 
+            #er_raft_state{status=Status, app_config=AppConfig}=State) when Status =/= ?ER_LEADER ->
   event_state("peer_install_snapshot.00", State),
-  NewState = update_leader_info(LeaderInfo, State),
-  NewState1 = case StateMachineData of
-                {Term, Index, Data} ->
-                  StateMachineApi = er_fsm_config:get_state_machine_api(State#er_raft_state.app_config),
-                  case StateMachineApi:write({Term, Index, Data}) of
-                    {AppliedTerm, AppliedIndex, _} ->
-                      NewState#er_raft_state{commit_term=AppliedTerm, commit_index=AppliedIndex, applied_term=AppliedTerm, applied_index=AppliedIndex}; 
-                    _Other1                        ->
-                      NewState
-                  end;
-                _Other2             ->
-                  NewState
-              end,
+  er_persist_data_api:write_vote(AppConfig, Vote),
+  StateMachineApi = er_fsm_config:get_state_machine_api(AppConfig),
+  StateMachineApi:write(StateMachineData),
   {NewReply2, NewState2} = case er_replicated_log_api:write(LogEntries) of 
                              {ok, _}            ->
-                               {LogTerm, LogIndex} = get_last_term_index(LogEntries),
-                               {?ER_ENTRY_ACCEPTED, NewState1#er_raft_state{prev_log_term=LogTerm, 
-                                                                            prev_log_index=LogIndex, 
-                                                                            log_entry_count=LogEntryCount,
-                                                                            log_entries=LogEntries,
-                                                                            unique_id=NewState1#er_raft_state.unique_id#er_unique_id{log_entries=UniqueId#er_unique_id.log_entries}}};
+                               NewState = update_leader_info(LeaderInfo, State),
+                               NewState1 = update_state(Snapshot, NewState),
+                               {?ER_ENTRY_ACCEPTED, NewState1};
                              {error, Reason, _} ->
-                               {{error, Reason}, NewState1} 
+                               {{error, Reason}, State}
                            end,
   event_reply("peer_install_snapshot.99", NewReply2),
   event_state("peer_install_snapshot.99", NewState2),
-  {reply, NewReply2, NewState2, get_timeout(NewState2)};
+  {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call(_, _From, #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId}=State) when LeaderId =/= undefined->
   event_state("follower_call.00", State),
   Reply = {error, {?ER_ENTRY_LEADER_ID, LeaderId}},
   event_reply("follower_call.99", Reply),
   event_state("follower_call.99", State),
-  {reply, Reply, State, get_timeout(State)};
+  {reply, Reply, State, get_timeout(Reply, State)};
 handle_call(_, _From, State) ->
   event_state("other_call.00", State),
   Reply = {error, ?ER_UNAVAILABLE},
   event_reply("other_call.99", Reply),
   event_state("other_call.99", State),
-  {reply, Reply, State, get_timeout(State)}.
+  {reply, Reply, State, get_timeout(Reply, State)}.
   
 handle_cast({?PEER_APPEND_ENTRIES_NOOP, #er_append_entries{leader_info=LeaderInfo}}, #er_raft_state{status=Status}=State) when Status =/= ?ER_LEADER ->
-%  event_state("peer_append_entries_noop.00", State),
   NewState = update_leader_info(LeaderInfo, State),
   NewState2 = NewState#er_raft_state{status=get_peer_status(NewState#er_raft_state.status)},
-%  event_state("peer_append_entries_noop.99", NewState2),
-  {noreply, NewState2, get_timeout(NewState2)};
+  {noreply, NewState2, get_timeout(?ER_ENTRY_ACCEPTED, NewState2)};
 handle_cast(_, State) ->
   event_state("other_cast.00", State),
-  {noreply, State, get_timeout(State)}.
+  {noreply, State, get_timeout(?ER_ENTRY_ACCEPTED, State)}.
 
 handle_info(timeout, #er_raft_state{status=?ER_FOLLOWER, config=Config}=State) when Config =/= undefined ->
   event_state("timeout_info.00", State),
@@ -212,20 +219,18 @@ handle_info(timeout, #er_raft_state{status=?ER_FOLLOWER, config=Config}=State) w
   NewState1 = update_status_change(?ER_CANDIDATE, NewState),
   NewState2 = request_vote(NewState1), 
   event_state("timeout_info.99", NewState2),
-  {noreply, NewState2, get_timeout(NewState2)};
+  {noreply, NewState2, get_timeout(?ER_ENTRY_ACCEPTED, NewState2)};
 handle_info(timeout, #er_raft_state{status=?ER_CANDIDATE, config=Config}=State) when Config =/= undefined ->
   event_state("timeout_info.00", State),
   NewState2 = request_vote(State),
   event_state("timeout_info.99", NewState2),
-  {noreply, NewState2, get_timeout(NewState2)};
+  {noreply, NewState2, get_timeout(?ER_ENTRY_ACCEPTED, NewState2)};
 handle_info(timeout, #er_raft_state{status=?ER_LEADER, config=Config}=State) when Config =/= undefined ->
-%  event_state("timeout_info.00", State),
   append_entries_noop(State),
-%  event_state("timeout_info.99", State),
-  {noreply, State, get_timeout(State)};
+  {noreply, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
 handle_info(_, State) ->
   event_state("other_info.00", State),
-  {noreply, State, get_timeout(State)}.
+  {noreply, State, get_timeout(?ER_ENTRY_ACCEPTED, State)}.
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
@@ -233,33 +238,19 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(_Reason, _State) ->
   ok.
 
-get_timeout(#er_raft_state{status=Status, app_config=AppConfig}) ->
-  case Status of
-    ?ER_LEADER    ->
+get_timeout(Reply, #er_raft_state{status=Status, app_config=AppConfig}) ->
+  case {Reply, Status} of
+    {?ER_REQUEST_SNAPSHOT, _} ->
+      infinity;
+    {_, ?ER_LEADER}           ->
       er_fsm_config:get_heartbeat_timeout(AppConfig);
-    ?ER_FOLLOWER  ->
+    {_, ?ER_FOLLOWER}         ->
       er_util:get_election_timeout(er_fsm_config:get_election_timeout(AppConfig));
-    ?ER_CANDIDATE -> 
+    {_, ?ER_CANDIDATE}        -> 
       er_util:get_election_timeout(er_fsm_config:get_election_timeout(AppConfig));
-    _Other        ->
+    {_, _}                    ->
       infinity
   end.
-
-update_state(Snapshot, #er_raft_state{app_config=AppConfig}=State) ->
-  {ok, ResultSnapshot} = er_util:read_snapshot(AppConfig, Snapshot),
-  State1 = update_state_machine(ResultSnapshot, State),
-  State2 = update_voted_for(ResultSnapshot, State1),
-  update_log_entries(ResultSnapshot, State2).
-
-update_state_machine(#er_snapshot{state_machine={Term, Index, _Data}}, State) ->
-  State#er_raft_state{applied_term=Term, applied_index=Index};
-update_state_machine(_, State) ->
-  State.
-
-%update_config_entry(#er_snapshot{config_entry=ConfigEntry=#er_log_entry{}}, State) ->
-%  update_config(ConfigEntry, State);
-%update_config_entry(_, State) ->
-%  State.
 
 update_config(ConfigEntry=#er_log_entry{}, State) ->
   ConfigList = er_util:config_list(ConfigEntry),
@@ -289,6 +280,16 @@ update_config(ConfigEntry=#er_log_entry{}, State) ->
 update_config(_, State) ->
   State.
 
+update_state(Snapshot, State) ->
+  State1 = update_state_machine(Snapshot, State),
+  State2 = update_voted_for(Snapshot, State1),
+  update_log_entries(Snapshot, State2).
+
+update_state_machine(#er_snapshot{state_machine={Term, Index, _Data}}, State) ->
+  State#er_raft_state{commit_term=Term, commit_index=Index, applied_term=Term, applied_index=Index};
+update_state_machine(_, State) ->
+  State.
+
 update_voted_for(#er_snapshot{voted_for=Vote}, State) ->
   update_voted_for(Vote, State);
 update_voted_for(#er_vote{term=Term}=Vote, State) ->
@@ -311,22 +312,20 @@ update_log_entries(#er_snapshot{log_entries=LogEntries, log_stats=LogStats}=Snap
                           unique_id=UniqueId, 
                           log_entries=LogEntries, 
                           prev_log_term=NewTerm,
-                          prev_log_index=NewIndex,
-                          commit_term=NewTerm,
-                          commit_index=NewIndex};      
+                          prev_log_index=NewIndex};      
     false ->
       State
   end.
 
-update_log_entry_state(#er_raft_state{log_entries=undefined}=State) ->
-  RequestSnapshot = #er_snapshot{log_entries=?ER_REQUEST, log_stats=?ER_REQUEST, state_machine=?ER_REQUEST},
-  update_state(RequestSnapshot, State);
+update_log_entry_state(#er_raft_state{log_entries=undefined, app_config=AppConfig}=State) ->
+  {ok, Snapshot} = er_snapshot:raft_log_entry(AppConfig),
+  update_state(Snapshot, State);
 update_log_entry_state(State) ->
   State.
 
-update_vote(State) ->
-  RequestSnapshot = #er_snapshot{voted_for=?ER_REQUEST},
-  update_state(RequestSnapshot, State).
+update_vote(#er_raft_state{app_config=AppConfig}=State) ->
+  {ok, Snapshot} = er_snapshot:raft_vote(AppConfig),
+  update_state(Snapshot, State).
 
 update_leader_info(#er_leader_info{leader_id=LeaderId, leader_term=LeaderTerm, config_entry=ConfigEntry}, State) ->
   update_config(ConfigEntry, State#er_raft_state{leader_id=LeaderId, current_term=LeaderTerm}).
@@ -338,12 +337,6 @@ get_last_term_index(Q0) ->
     {value, Entry} ->
       {Entry#er_log_entry.term, Entry#er_log_entry.index}
   end.
-
-%get_term_index({CurrentTerm, CurrentIndex}, {NewTerm, NewIndex}) ->
-%  case NewTerm >= CurrentTerm andalso NewIndex > CurrentIndex of
-%    true  -> {NewTerm, NewIndex};
-%    false -> {CurrentTerm, CurrentIndex}
-%  end.
 
 request_vote(#er_raft_state{app_config=AppConfig, current_term=CurrentTerm}=State) ->
   RequestVote = er_entry_util:make_request_vote(State),
@@ -370,28 +363,11 @@ append_entries_noop(_State) ->
   ok.
   
 process_vote(RequestedVote, #er_raft_state{vote=CurrentVote, app_config=AppConfig}=State) ->
-  case valid_vote(RequestedVote, CurrentVote, State) of
+  case er_vote:valid(RequestedVote, CurrentVote, State) of
     true  -> er_persist_data_api:write_vote(AppConfig, RequestedVote), 
              {?ER_ENTRY_ACCEPTED, State#er_raft_state{vote=RequestedVote}};
     false -> {?ER_ENTRY_REJECTED, State}
   end.
-
-valid_vote(RequestVote, CurrentVote, State) ->
-  valid_vote(RequestVote, CurrentVote) andalso valid_vote(RequestVote, State).
-
-valid_vote(#er_vote{term=RequestTerm, prev_log_term=RequestLogTerm, prev_log_index=RequestLogIndex}, 
-           #er_vote{term=CurrentTerm, prev_log_term=CurrentLogTerm, prev_log_index=CurrentLogIndex}) ->
-  valid_vote(RequestTerm, RequestLogTerm, RequestLogIndex, CurrentTerm, CurrentLogTerm, CurrentLogIndex);
-valid_vote(#er_vote{term=RequestTerm, prev_log_term=RequestLogTerm, prev_log_index=RequestLogIndex},
-           #er_raft_state{current_term=CurrentTerm, prev_log_term=PrevLogTerm, prev_log_index=PrevLogIndex}) ->
-  valid_vote(RequestTerm, RequestLogTerm, RequestLogIndex, CurrentTerm, PrevLogTerm, PrevLogIndex);
-valid_vote(_, _) ->
-  true.
-
-valid_vote(RequestTerm, RequestLogTerm, RequestLogIndex, CurrentTerm, CurrentLogTerm, CurrentLogIndex) ->
-  (RequestTerm > CurrentTerm andalso RequestLogTerm >= CurrentLogTerm andalso RequestLogIndex >= CurrentLogIndex) orelse
-  (RequestTerm =:= CurrentTerm andalso RequestLogTerm > CurrentLogTerm andalso RequestLogIndex >= CurrentLogIndex) orelse
-  (RequestTerm =:= CurrentTerm andalso RequestLogTerm =:= CurrentLogTerm andalso RequestLogIndex > CurrentLogIndex).
 
 get_peer_status(Status) ->
   case Status of
@@ -400,8 +376,7 @@ get_peer_status(Status) ->
   end.
 
 init_state(State) ->
-  NewState = #er_raft_state{config=State#er_raft_state.config, app_config=State#er_raft_state.app_config},
-  update_voted_for(State#er_raft_state.vote, NewState).
+  State#er_raft_state{leader_id=undefined}.
 
 update_status_change(NewStatus, #er_raft_state{status=CurrentStatus}=State) when NewStatus =/= CurrentStatus ->
   event_state("update_status_change.00", State),
@@ -429,6 +404,14 @@ event_state(Msg, State) ->
 event_reply(Msg, Reply) ->
   er_event:reply("er_raft_server." ++ Msg, Reply).
 
+process_install_snapshot(Replies1, InstallSnapshotNodes, ConfigEntry, FinalFlag, #er_raft_state{config=Config, app_config=AppConfig}=State) ->
+  {ok, RaftSnapshot} = er_snapshot:raft_snapshot(AppConfig),
+  RaftSnapshot1 = RaftSnapshot#er_snapshot{leader_info=er_entry_util:make_leader_info(State#er_raft_state.leader_id,
+                                                                                      State#er_raft_state.current_term,
+                                                                                      ConfigEntry)},
+  {Replies2, BadNodes2} = er_raft_peer_api:install_snapshot(InstallSnapshotNodes, RaftSnapshot1),
+  er_entry_util:make_reply({Replies1 ++ Replies2, BadNodes2}, Config, er_fsm_config:get_optimistic_mode(AppConfig), FinalFlag).
+
 process_leader_log_entry(AppendEntries, #er_raft_state{config=Config, app_config=AppConfig}=State) ->
   case append_log_entry(AppendEntries, State) of 
     {ok, NewState1} ->
@@ -439,12 +422,7 @@ process_leader_log_entry(AppendEntries, #er_raft_state{config=Config, app_config
           NewState2 = update_log_entry_leader_state(NewState1),
           {{ok, ?ER_ENTRY_ACCEPTED}, NewState2};
         {?INSTALL_SNAPSHOT, {Replies1, InstallSnapshotNodes}}  ->
-          {ok, RaftSnapshot} = er_snapshot:raft_snapshot(AppConfig),
-          RaftSnapshot1 = RaftSnapshot#er_snapshot{leader_info=er_entry_util:make_leader_info(State#er_raft_state.leader_id, 
-                                                                                              State#er_raft_state.current_term, 
-                                                                                              State#er_raft_state.config#er_config.current_config)},
-          {Replies2, BadNodes2} = er_raft_peer_api:install_snapshot(InstallSnapshotNodes, RaftSnapshot1),
-          Reply3 = er_entry_util:make_reply({Replies1 ++ Replies2, BadNodes2}, Config, er_fsm_config:get_optimistic_mode(AppConfig), true),
+          Reply3 = process_install_snapshot(Replies1, InstallSnapshotNodes, State#er_raft_state.config#er_config.current_config, true, State),
           case Reply3 of
             {ok, _} ->
               NewState3 = update_log_entry_leader_state(NewState1),

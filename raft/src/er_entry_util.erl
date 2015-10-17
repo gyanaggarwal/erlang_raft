@@ -57,9 +57,15 @@ make_log_entry(#er_cmd_entry{type=?TYPE_OP}=Entry, #er_raft_state{current_term=C
   #er_log_entry{term=CurrentTerm, index=PrevLogIndex+1, entry=Entry}.
 
 -spec make_append_entries(Type :: ?TYPE_CONFIG | ?TYPE_OP | ?TYPE_NOOP, Entry :: #er_log_entry{}, State :: #er_raft_state{}) -> #er_append_entries{}.
-make_append_entries(?TYPE_CONFIG,  Entry=#er_log_entry{}, #er_raft_state{current_term=CurrentTerm, leader_id=LeaderId}) ->
+make_append_entries(?TYPE_CONFIG,  Entry=#er_log_entry{}, #er_raft_state{current_term=CurrentTerm, leader_id=LeaderId}=State) ->
   Q0 = er_queue:insert(Entry, er_queue:new()),
-  #er_append_entries{type=?TYPE_CONFIG, leader_info=make_leader_info(LeaderId, CurrentTerm, Entry), log_entries=Q0};
+  #er_append_entries{type=?TYPE_CONFIG, 
+                     leader_info=make_leader_info(LeaderId, CurrentTerm, Entry), 
+                     prev_log_term=State#er_raft_state.prev_log_term,
+                     prev_log_index=State#er_raft_state.prev_log_index,
+                     leader_commit_term=State#er_raft_state.commit_term,
+                     leader_commit_index=State#er_raft_state.commit_index,
+                     log_entries=Q0};
 make_append_entries(?TYPE_NOOP,  _Entry, #er_raft_state{current_term=CurrentTerm, leader_id=LeaderId, config=#er_config{current_config=ConfigEntry}}) ->
   #er_append_entries{type=?TYPE_NOOP, leader_info=make_leader_info(LeaderId, CurrentTerm, ConfigEntry)};
 make_append_entries(?TYPE_OP, Entry=#er_log_entry{}, State=#er_raft_state{}) ->
