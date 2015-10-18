@@ -21,7 +21,7 @@
 
 -export([request_vote/1,
          append_entries_op/1,
-         append_entries_config/2,
+         append_entries_config/1,
          append_entries_noop/1,
          install_snapshot/2]).
 
@@ -35,9 +35,9 @@ request_vote(RequestVote) ->
 append_entries_op(AppendEntries) ->
   call({?APPEND_ENTRIES_OP, AppendEntries}).
 
--spec append_entries_config(ConfigEntry :: #er_log_entry{}, AppendEntries :: #er_append_entries{}) -> term() | {error, atom()}.
-append_entries_config(ConfigEntry, AppendEntries) ->
-  call({?APPEND_ENTRIES_CONFIG, {ConfigEntry, AppendEntries}}).
+-spec append_entries_config(AppendEntries :: #er_append_entries{}) -> term() | {error, atom()}.
+append_entries_config(AppendEntries) ->
+  call({?APPEND_ENTRIES_CONFIG, AppendEntries}).
 
 -spec append_entries_noop(AppendEntries :: #er_append_entries{}) -> ok | {error, atom()}.
 append_entries_noop(AppendEntries) ->

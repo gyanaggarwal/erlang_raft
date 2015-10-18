@@ -27,7 +27,6 @@
 -define(ER_TRUNCATED,               er_truncated).
 -define(ER_STABLE,                  er_stable).
 -define(ER_KEEP_STATUS,             er_keep_status).
--define(ER_CONFIG_CHANGE,           er_config_change).
 -define(ER_EMPTY,                   er_empty).
 -define(ER_UNDEFINED,               er_undefined).
 -define(ER_UNAVAILABLE,             er_unavailable).
@@ -40,8 +39,6 @@
 -define(ER_ENTRY_REJECTED,          er_entry_rejected).
 -define(ER_CONFIG_ACCEPTED,         er_config_accepted).
 -define(ER_CONFIG_REJECTED,         er_config_rejected).
--define(ER_CONFIG_CHANGE_ACCEPTED,  er_config_change_accepted).
--define(ER_CONFIG_CHANGE_REJECTED,  er_config_change_rejected).
 -define(ER_ENTRY_LEADER_ID,         er_entry_leader_id).
 -define(ER_ENTRY_DUPLICATE,         er_entry_duplicate).
 -define(ER_REQUEST_SNAPSHOT,        er_request_snapshot).
@@ -107,12 +104,6 @@
                               prev_log_term=0           :: non_neg_integer(),
                               prev_log_index=0          :: non_neg_integer()}).
 
--record(er_config,           {status=?ER_UNDEFINED      :: ?ER_UNDEFINED | 
-                                                           ?ER_STABLE | 
-                                                           ?ER_CONFIG_CHANGE,
-                              current_config            :: #er_log_entry{},
-                              new_config                :: #er_log_entry{}}).
-			      
 -record(er_replicated_log,   {status=?ER_UNDEFINED      :: ?ER_UNDEFINED |
                                                            error |
                                                            ?ER_TRUNCATED |
@@ -157,7 +148,7 @@
                               log_entries               :: queue:queue(),
                               unique_id=#er_unique_id{} :: #er_unique_id{},
                               vote                      :: #er_vote{},
-                              config                    :: #er_config{},
+                              config_entry              :: #er_log_entry{},
                               app_config                :: #er_app_config{}}).
 
 -record(er_peer_state,       {app_config                :: #er_app_config{}}).

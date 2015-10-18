@@ -25,8 +25,7 @@
          make_install_snapshot/2,
          make_reply/4,
          make_request_vote/1,
-         make_leader_info/3,
-         equal_list/2]).
+         make_leader_info/3]).
 
 -include("er_fsm.hrl").
 
@@ -47,7 +46,7 @@ quorum(NodeList) ->
   QSize1.
 
 -spec make_request_vote(State :: #er_raft_state{}) -> #er_request_vote{}.
-make_request_vote(#er_raft_state{current_term=CurrentTerm, prev_log_term=PrevLogTerm, prev_log_index=PrevLogIndex, config=#er_config{current_config=ConfigEntry}}) ->
+make_request_vote(#er_raft_state{current_term=CurrentTerm, prev_log_term=PrevLogTerm, prev_log_index=PrevLogIndex, config_entry=ConfigEntry}) ->
   #er_request_vote{vote=#er_vote{term=CurrentTerm+1, candidate_id=node(), prev_log_term=PrevLogTerm, prev_log_index=PrevLogIndex}, config_entry=ConfigEntry}.
 
 -spec make_log_entry(Entry :: #er_cmd_entry{}, State :: #er_raft_state{}) -> #er_log_entry{}.
@@ -66,12 +65,12 @@ make_append_entries(?TYPE_CONFIG,  Entry=#er_log_entry{}, #er_raft_state{current
                      leader_commit_term=State#er_raft_state.commit_term,
                      leader_commit_index=State#er_raft_state.commit_index,
                      log_entries=Q0};
-make_append_entries(?TYPE_NOOP,  _Entry, #er_raft_state{current_term=CurrentTerm, leader_id=LeaderId, config=#er_config{current_config=ConfigEntry}}) ->
+make_append_entries(?TYPE_NOOP,  _Entry, #er_raft_state{current_term=CurrentTerm, leader_id=LeaderId, config_entry=ConfigEntry}) ->
   #er_append_entries{type=?TYPE_NOOP, leader_info=make_leader_info(LeaderId, CurrentTerm, ConfigEntry)};
 make_append_entries(?TYPE_OP, Entry=#er_log_entry{}, State=#er_raft_state{}) ->
   Q0 = er_queue:insert(Entry, er_queue:new()),
   #er_append_entries{type=?TYPE_OP,
-                     leader_info=make_leader_info(State#er_raft_state.leader_id, State#er_raft_state.current_term, State#er_raft_state.config#er_config.current_config),
+                     leader_info=make_leader_info(State#er_raft_state.leader_id, State#er_raft_state.current_term, State#er_raft_state.config_entry),
                      prev_log_term=State#er_raft_state.prev_log_term,
                      prev_log_index=State#er_raft_state.prev_log_index,
                      leader_commit_term=State#er_raft_state.commit_term,
@@ -79,38 +78,14 @@ make_append_entries(?TYPE_OP, Entry=#er_log_entry{}, State=#er_raft_state{}) ->
                      log_entries=Q0}.  
 
 -spec make_install_snapshot(Snapshot :: #er_snapshot{}, State :: #er_raft_state{}) -> #er_snapshot{}.
-make_install_snapshot(Snapshot, #er_raft_state{leader_id=LeaderId, current_term=CurrentTerm, config=#er_config{current_config=ConfigEntry}}) ->
+make_install_snapshot(Snapshot, #er_raft_state{leader_id=LeaderId, current_term=CurrentTerm, config_entry=ConfigEntry}) ->
   Snapshot#er_snapshot{leader_info=make_leader_info(LeaderId, CurrentTerm, ConfigEntry)}.
 
--spec make_reply({Replies :: list(), BadNodes :: list()}, Config :: #er_config{}, OptimisticMode :: boolean(), FinalFlag :: boolean()) -> term().
-make_reply({Replies, _BadNodes}, Config, OptimisticMode, FinalFlag) ->
+-spec make_reply({Replies :: list(), BadNodes :: list()}, ConfigEntry :: #er_log_entry{}, OptimisticMode :: boolean(), FinalFlag :: boolean()) -> term().
+make_reply({Replies, _BadNodes}, ConfigEntry, OptimisticMode, FinalFlag) ->
   NodeReply = make_node_reply(Replies, #node_reply{}),
-  ConfigList = config_node_list(Config),
-  case Config#er_config.status of 
-    ?ER_STABLE        -> 
-      make_output_reply(NodeReply, ConfigList, FinalFlag, OptimisticMode);
-    ?ER_CONFIG_CHANGE ->
-       {_, ConfigList2} = ConfigList,
-       NodeReply2 = filter_node_reply(NodeReply, ConfigList2),
-       make_output_reply(NodeReply2, ConfigList2, FinalFlag, OptimisticMode)
-%      {ConfigList1, ConfigList2} = ConfigList,
-%      NodeReply1 = filter_node_reply(NodeReply, ConfigList1),
-%      NodeReply2 = filter_node_reply(NodeReply, ConfigList2),
-%      Reply1 = make_output_reply(NodeReply1, ConfigList1, FinalFlag, OptimisticMode),
-%      Reply2 = make_output_reply(NodeReply2, ConfigList2, FinalFlag, OptimisticMode),
-%      case {Reply1, Reply2} of
-%        {{ok, _}, {ok, _}}                                                     ->
-%          Reply1;
-%        {{error, {?ER_LEADER_STEP_DOWN, _, LeaderTerm1}}, {error, {?ER_LEADER_STEP_DOWN, _, LeaderTerm2}}} when LeaderTerm1 > LeaderTerm2 ->
-%          Reply1;
-%        {{error, {?ER_LEADER_STEP_DOWN,	_, _}}, {error, {?ER_LEADER_STEP_DOWN, _, _}}}  ->
-%          Reply2;
-%        {{error, _}, _}                                                        ->
-%          Reply1;
-%        {_, {error, _}}                                                        ->
-%          Reply2
-%      end
-  end.
+  ConfigList = er_util:config_list(ConfigEntry),
+  make_output_reply(NodeReply, ConfigList, FinalFlag, OptimisticMode).
 
 -spec make_node_reply(Replies :: list(),  NodeReply :: #node_reply{}) -> #node_reply{}.
 make_node_reply([{Node, Reply} | TReplies], NodeReply) ->
@@ -179,58 +154,6 @@ total_reply(NodeReply) ->
   length(NodeReply#node_reply.er_leader_step_down)+
   length(NodeReply#node_reply.error).
   
--spec intersection(List1 :: list(), ConfigList :: list(), OutList :: list()) -> list().
-intersection([Node | TList], ConfigList, OutList) ->
-  NewOutList = case lists:member(Node, ConfigList) of
-                 true  ->
-                   [Node | OutList];
-                 false ->
-                   OutList
-               end,
-  intersection(TList, ConfigList, NewOutList);
-intersection([], _ConfigList, OutList) ->
-  OutList.
-
--spec key_intersection(List1 :: list(), ConfigList :: list(), OutList :: list()) -> list().
-key_intersection([{Node, Value} | TList], ConfigList, OutList) ->
-  NewOutList = case lists:member(Node, ConfigList) of
-                 true  ->
-                   [{Node, Value} | OutList];
-                 false ->
-                   OutList
-               end,
-  key_intersection(TList, ConfigList, NewOutList);
-key_intersection([], _ConfigList, OutList) ->
-  OutList.
-
--spec filter_node_reply(NodeReply :: #node_reply{}, ConfigList :: list()) -> #node_reply{}. 
-filter_node_reply(NodeReply, ConfigList) ->
-  NodeReply#node_reply{er_entry_accepted=key_intersection(NodeReply#node_reply.er_entry_accepted, ConfigList, []),
-                       er_entry_rejected=intersection(NodeReply#node_reply.er_entry_rejected, ConfigList, []),
-                       er_request_snapshot=intersection(NodeReply#node_reply.er_request_snapshot, ConfigList, []),
-                       er_entry_leader_id=key_intersection(NodeReply#node_reply.er_entry_leader_id, ConfigList, []),
-                       error=key_intersection(NodeReply#node_reply.error, ConfigList, [])}.
-
--spec config_node_list(Config :: #er_config{}) -> list() | {list(), list()}.
-config_node_list(#er_config{status=?ER_UNDEFINED}) ->
-  [];
-config_node_list(#er_config{status=?ER_STABLE, current_config=CurrentConfig}) ->
-  er_util:config_list(CurrentConfig);
-config_node_list(#er_config{status=?ER_CONFIG_CHANGE, current_config=CurrentConfig, new_config=NewConfig}) ->
-  {er_util:config_list(CurrentConfig), er_util:config_list(NewConfig)};
-config_node_list(_) ->
-  [].
-
--spec equal_list(List1 :: list(), List2 :: list()) -> boolean().
-equal_list(List1, List2) ->
-  case length(List1) =:= length(List2) of
-    true  ->
-      List3 = intersection(List1, List2, []),
-      length(List3) =:= length(List1);
-    false -> 
-      false
-  end.
-
 -spec make_leader_info(LeaderId :: atom(), LeaderTerm :: non_neg_integer(), ConfigEntry :: #er_log_entry{}) -> #er_leader_info{}.
 make_leader_info(LeaderId, LeaderTerm, ConfigEntry) ->
   #er_leader_info{leader_id=LeaderId, leader_term=LeaderTerm, config_entry=ConfigEntry}.

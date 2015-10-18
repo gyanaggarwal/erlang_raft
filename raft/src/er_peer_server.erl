@@ -36,21 +36,15 @@ init([AppConfig]) ->
   {ok, #er_peer_state{app_config=AppConfig}}.
   
 handle_call({?REQUEST_VOTE, RequestVote}, _From, #er_peer_state{app_config=AppConfig}=State) ->
-  ConfigEntry = RequestVote#er_request_vote.config_entry,
-  ConfigList = er_util:config_list(ConfigEntry),
-  PeerNodeList = er_util:peer_node_list(ConfigList),
+  PeerNodeList = peer_node_list(RequestVote),
   Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_REQUEST_VOTE, RequestVote}),
   {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)};
 handle_call({?APPEND_ENTRIES_OP, AppendEntries}, _From, #er_peer_state{app_config=AppConfig}=State) ->
-  ConfigEntry = AppendEntries#er_append_entries.leader_info#er_leader_info.config_entry,
-  ConfigList = er_util:config_list(ConfigEntry),
-  PeerNodeList = er_util:peer_node_list(ConfigList),
+  PeerNodeList = peer_node_list(AppendEntries),
   Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_APPEND_ENTRIES_OP, AppendEntries}),
   {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)};
-handle_call({?APPEND_ENTRIES_CONFIG, {CurrentConfig, AppendEntries}}, _From, #er_peer_state{app_config=AppConfig}=State) ->
-  NewConfigEntry = AppendEntries#er_append_entries.leader_info#er_leader_info.config_entry,
-  AllConfigList =  er_util:merge_list(er_util:config_list(CurrentConfig), er_util:config_list(NewConfigEntry)),
-  PeerNodeList = er_util:peer_node_list(AllConfigList),
+handle_call({?APPEND_ENTRIES_CONFIG, AppendEntries}, _From, #er_peer_state{app_config=AppConfig}=State) ->
+  PeerNodeList = peer_node_list(AppendEntries),
   Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_APPEND_ENTRIES_CONFIG, AppendEntries}),
   {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)};
 handle_call({?INSTALL_SNAPSHOT, {NodeList, Snapshot}}, _From, #er_peer_state{app_config=AppConfig}=State) ->
@@ -58,9 +52,7 @@ handle_call({?INSTALL_SNAPSHOT, {NodeList, Snapshot}}, _From, #er_peer_state{app
   {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)}.
 
 handle_cast({?APPEND_ENTRIES_NOOP, AppendEntries}, State) ->
-  ConfigEntry = AppendEntries#er_append_entries.leader_info#er_leader_info.config_entry,
-  ConfigList = er_util:config_list(ConfigEntry),
-  PeerNodeList = er_util:peer_node_list(ConfigList),
+  PeerNodeList = peer_node_list(AppendEntries),
   gen_server:abcast(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_APPEND_ENTRIES_NOOP, AppendEntries}),
   {noreply, State}.  
 
@@ -72,4 +64,13 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
+
+peer_node_list(#er_append_entries{leader_info=#er_leader_info{config_entry=ConfigEntry}}) ->
+  peer_node_list(ConfigEntry);
+peer_node_list(#er_request_vote{config_entry=ConfigEntry}) ->
+  peer_node_list(ConfigEntry);
+peer_node_list(#er_log_entry{}=ConfigEntry) ->
+  ConfigList = er_util:config_list(ConfigEntry),
+  er_util:peer_node_list(ConfigList).
+
 
