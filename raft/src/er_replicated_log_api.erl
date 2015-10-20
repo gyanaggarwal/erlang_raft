@@ -55,19 +55,19 @@ append(Entries) ->
 append_entry(Entry, Status) ->
   append(er_queue:insert(Entry, er_queue:new()), Status).
 
--spec append_entry_compact(Entry :: #er_log_entry{}, State :: #er_raft_state{}) -> {ok, non_neg_integer(), queue:queue() | undefined, sets:set() | undefined, status_output()} | {error, atom(), status_output()}.
-append_entry_compact(Entry, #er_raft_state{log_entry_count=LogEntryCount, applied_term=AppliedTerm, applied_index=AppliedIndex, app_config=AppConfig}) ->
+-spec append_entry_compact(Entry :: #er_log_entry{}, State :: #er_raft_state{}) -> {ok, queue:queue() | undefined, sets:set() | undefined, status_output()} | {error, atom(), status_output()}.
+append_entry_compact(Entry, #er_raft_state{log_entries=LogEntries, applied_term=AppliedTerm, applied_index=AppliedIndex, app_config=AppConfig}) ->
   case append_entry(Entry, ?ER_KEEP_STATUS) of
     {ok, Status} ->
       case er_fsm_config:get_log_retention_size(AppConfig) of
         {_, infinity} ->
-          {ok, LogEntryCount+1, undefined, undefined, Status};
+          {ok, undefined, undefined, Status};
         {Min, Max}    ->
-          case LogEntryCount >= Max of
+          case er_queue:len(LogEntries) >= Max of
             true  ->
               compact_log(AppliedTerm, AppliedIndex, Min);
             false ->
-              {ok, LogEntryCount+1, undefined, undefined, Status}
+              {ok, undefined, undefined, Status}
           end
       end;
     Other        -> 
@@ -90,13 +90,13 @@ last_entry(Status) ->
 last_entry() ->
   last_entry(?ER_KEEP_STATUS).
 
--spec compact_log(AppliedTerm :: non_neg_integer(), AppliedIndex :: non_neg_integer(), MinCount :: non_neg_integer()) -> {ok, non_neg_integer(), queue:queue(), sets:set(), status_output()}.
+-spec compact_log(AppliedTerm :: non_neg_integer(), AppliedIndex :: non_neg_integer(), MinCount :: non_neg_integer()) -> {ok, queue:queue(), sets:set(), status_output()}.
 compact_log(AppliedTerm, AppliedIndex, MinCount) ->
   {ok, Qi0, _} = read(),
   {value, #er_log_entry{term=Term, index=Index}} = er_queue:peek_lifo(Qi0),
   Qo0 = er_util:applied_sub_list(Qi0, Term, Index, AppliedTerm, AppliedIndex, MinCount, er_queue:new()),
   {ok, Status} = write(Qo0),
-  {ok, er_queue:len(Qo0), Qo0, er_util:unique_id(Qo0), Status}.
+  {ok, Qo0, er_util:unique_id(Qo0), Status}.
 
 
 

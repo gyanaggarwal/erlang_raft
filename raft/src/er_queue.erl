@@ -56,7 +56,12 @@ is_empty(Q0) ->
 
 -spec len(Q0 :: queue:queue()) -> non_neg_integer().
 len(Q0) ->
-  queue:len(Q0).
+  case is_queue(Q0) of
+    true  ->
+      queue:len(Q0);
+    false ->
+      0
+  end.
 
 -spec insert(Item :: term(), Q0 :: queue:queue()) -> queue:queue().
 insert(Item, Q0) ->

@@ -47,16 +47,15 @@ update_voted_for(_, State) ->
 update_log_entries(#er_snapshot{log_entries=LogEntries, log_stats=LogStats}=Snapshot, State) ->
   case er_queue:is_queue(LogEntries) of
     true  ->
-      {LogCount, UniqueId} = case LogStats of
-                               ?ER_REQUEST ->
-                                 {Snapshot#er_snapshot.log_entry_count, State#er_raft_state.unique_id#er_unique_id{log_entries=Snapshot#er_snapshot.unique_id#er_unique_id.log_entries}};
-                               _           ->
-                                 {State#er_raft_state.log_entry_count, State#er_raft_state.unique_id}
-                             end,
+      UniqueId = case LogStats of
+                   ?ER_REQUEST ->
+                     State#er_raft_state.unique_id#er_unique_id{log_entries=Snapshot#er_snapshot.unique_id#er_unique_id.log_entries};
+                   _           ->
+                     State#er_raft_state.unique_id
+                 end,
       {NewTerm, NewIndex} = er_util:get_last_term_index(LogEntries),
 
-      State#er_raft_state{log_entry_count=LogCount,
-                          unique_id=UniqueId,
+      State#er_raft_state{unique_id=UniqueId,
                           log_entries=LogEntries,
                           prev_log_term=NewTerm,
                           prev_log_index=NewIndex};

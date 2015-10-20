@@ -370,20 +370,19 @@ append_log_entry(AppendEntries, #er_raft_state{log_entries=LogEntries, unique_id
   case er_replicated_log_api:append_entry_compact(LogEntry, State) of
     {error, Reason, _}              ->
       {{error, Reason}, State};
-    {ok, LogEntryCount0, Q0, S0, _} ->
-      {Q2, S2} = case er_queue:is_queue(Q0) of
+    {ok, Q0, S0, _} ->
+      {Q2, U2} = case er_queue:is_queue(Q0) of
                    false ->
                      Q1 = er_queue:insert(LogEntry, LogEntries),
-                     S1 = sets:add_element(er_util:cmd_id(logEntry), UniqueId#er_unique_id.log_entries),
-                     {Q1, S1};
+                     U1 = er_util:add_log_entry_id(LogEntry, UniqueId),
+                     {Q1, U1};
                    true  ->
-                     {Q0, S0}
+                     {Q0, UniqueId#er_unique_id{log_entries=S0}}
                  end,
-       NewState = State#er_raft_state{log_entry_count=LogEntryCount0,
-                                      prev_log_term=LogEntry#er_log_entry.term,
+       NewState = State#er_raft_state{prev_log_term=LogEntry#er_log_entry.term,
                                       prev_log_index=LogEntry#er_log_entry.index,
                                       log_entries=Q2,
-                                      unique_id=UniqueId#er_unique_id{log_entries=S2}},
+                                      unique_id=U2},
       {ok, NewState}
   end.
 
@@ -403,7 +402,8 @@ apply_log_entry(#er_raft_state{commit_term=CommitTerm,
   end.
 
 event_state(Msg, State) ->
-  er_event:state("er_raft_server." ++ Msg, State).
+  er_event:state(?MODULE, Msg, State).
 
 event_reply(Msg, Reply) ->
-  er_event:reply("er_raft_server." ++ Msg, Reply).
+  er_event:reply(?MODULE, Msg, Reply).
+

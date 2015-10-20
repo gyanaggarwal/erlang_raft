@@ -129,7 +129,6 @@
                               voted_for                 :: undefined | ?ER_REQUEST | ?ER_EMPTY | #er_vote{},
                               log_entries               :: undefined | ?ER_REQUEST | ?ER_EMPTY | queue:queue(),
                               log_stats                 :: undefined | ?ER_REQUEST,
-                              log_entry_count=0         :: non_neg_integer(),
                               unique_id=#er_unique_id{} :: #er_unique_id{}}).
 
 -record(er_raft_state,       {status=?ER_NOT_IN_CONFIG  :: ?ER_FOLLOWER |
@@ -137,7 +136,6 @@
                                                            ?ER_CANDIDATE |
                                                            ?ER_NOT_IN_CONFIG,
                               leader_id                 :: atom(),
-                              log_entry_count=0         :: non_neg_integer(),
                               current_term=0            :: non_neg_integer(),
                               prev_log_term=0           :: non_neg_integer(),
                               prev_log_index=0          :: non_neg_integer(),      

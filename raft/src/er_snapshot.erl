@@ -72,13 +72,13 @@ read_log_entries(_AppConfig, Snapshot) ->
         true  ->
           Snapshot1 = case Snapshot#er_snapshot.log_stats of
                         ?ER_REQUEST ->
-                          Snapshot#er_snapshot{log_entry_count=er_queue:len(Q0), unique_id=Snapshot#er_snapshot.unique_id#er_unique_id{log_entries=er_util:unique_id(Q0)}};
+                          Snapshot#er_snapshot{unique_id=Snapshot#er_snapshot.unique_id#er_unique_id{log_entries=er_util:unique_id(Q0)}};
                         _           ->
                           Snapshot
                       end,
           Snapshot1#er_snapshot{log_entries=Q0};
         false ->
-          Snapshot#er_snapshot{log_entry_count=0, log_entries=er_queue:new()}
+          Snapshot#er_snapshot{log_entries=er_queue:new()}
       end;
     _Other      ->
       Snapshot

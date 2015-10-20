@@ -21,7 +21,7 @@
 
 -export([start_link/0, add_handler/2, delete_handler/2]).
 
--export([state/2, request/2, reply/2, data/3]).
+-export([state/3, request/3, reply/3, data/4]).
 
 -define(SERVER, ?MODULE).
 
@@ -37,14 +37,14 @@ delete_handler(Handler, Args) ->
 event_notify(Tag, Event) ->
   gen_event:notify(?SERVER, {Tag, Event}).
 
-state(Msg, State) ->
-  event_notify(state, {Msg, State}).
+state(Module, Msg, State) ->
+  event_notify(state, {Module, Msg, State}).
 
-data(Msg, DataMsg, Data) ->
-  event_notify(data, {Msg, DataMsg, Data}).
+data(Module, Msg, DataMsg, Data) ->
+  event_notify(data, {Module, Msg, DataMsg, Data}).
 
-request(Msg, Request) ->
-  data(Msg, request, Request).
+request(Module, Msg, Request) ->
+  data(Module, Msg, request, Request).
 
-reply(Msg, Reply) ->
-  data(Msg, reply, Reply).
+reply(Module, Msg, Reply) ->
+  data(Module, Msg, reply, Reply).
