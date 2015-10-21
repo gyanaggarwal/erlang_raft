@@ -1,20 +1,19 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Licensed to the Apache Software Foundation (ASF) under one
-% or more contributor license agreements.  See the NOTICE file
-% distributed with this work for additional information
-% regarding copyright ownership.  The ASF licenses this file
-% to you under the Apache License, Version 2.0 (the
-% "License"); you may not use this file except in compliance
-% with the License.  You may obtain a copy of the License at
-%
-%   http://www.apache.org/licenses/LICENSE-2.0
-%
-% Unless required by applicable law or agreed to in writing,
-% software distributed under the License is distributed on an
-% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-% KIND, either express or implied.  See the License for the
-% specific language governing permissions and limitations
-% under the License.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Copyright (c) 2015 Gyanendra Aggarwal.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -module(er_raft_server).
@@ -175,6 +174,20 @@ handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo,
   event_reply("peer_install_snapshot.99", NewReply2),
   event_state("peer_install_snapshot.99", NewState2),
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
+
+handle_call(?GET_RAFT_SERVER_STATUS, _From, State) ->
+  Reply = [{status,                   State#er_raft_state.status},
+           {node_id,                  node()},
+           {leader_id,                State#er_raft_state.leader_id},
+           {current_term,             State#er_raft_state.current_term},
+           {prev_log_term,            State#er_raft_state.prev_log_term},
+           {prev_log_index,           State#er_raft_state.prev_log_index},
+           {commit_term,              State#er_raft_state.commit_term},
+           {commit_index,             State#er_raft_state.commit_index},
+           {applied_index,            State#er_raft_state.applied_term},
+           {applied_index,            State#er_raft_state.applied_index},
+           {vote,                     State#er_raft_state.vote}],
+  {reply, Reply, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
 
 handle_call(_, _From, #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId}=State) when LeaderId =/= undefined->
   event_state("follower_call.00", State),
@@ -394,7 +407,7 @@ apply_log_entry(#er_raft_state{commit_term=CommitTerm,
                                app_config=AppConfig}=State) ->
   NewLogEntries = er_util:applied_sub_list(LogEntries, CommitTerm, CommitIndex, AppliedTerm, AppliedIndex, 0, er_queue:new()),
   StateMachineApi = er_fsm_config:get_state_machine_api(AppConfig),
-  case StateMachineApi:update_sync(NewLogEntries) of
+  case StateMachineApi:update(NewLogEntries) of
     {NewAppliedTerm, NewAppliedIndex, _} ->
       State#er_raft_state{applied_term=NewAppliedTerm, applied_index=NewAppliedIndex};
     _                                    ->

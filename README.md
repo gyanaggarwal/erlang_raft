@@ -20,5 +20,7 @@ There is a sys.config file to customize its operation and behavior.
 A detailed document is also available to understand its implementation 
 and customization.
 
+A testing document readme_test.txt is also available.
+
 
  
