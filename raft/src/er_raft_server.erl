@@ -59,7 +59,10 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_NOT_IN_C
   {NewReply2, NewState2} = case NewState#er_raft_state.status of
                              ?ER_FOLLOWER ->
                                NewReply = er_raft_peer_api:append_entries_config(AppendEntries),
-                               NewReply1 = er_entry_util:make_reply(NewReply, NewState#er_raft_state.config_entry, er_fsm_config:get_optimistic_mode(NewState#er_raft_state.app_config), true),
+                               NewReply1 = er_entry_util:make_reply(NewReply, 
+                                                                    NewState#er_raft_state.config_entry, 
+                                                                    er_fsm_config:get_optimistic_mode(NewState#er_raft_state.app_config), 
+                                                                    true),
                                case NewReply1 of 
                                  {ok, _}                                      ->
                                    {{ok, ?ER_CONFIG_ACCEPTED}, NewState};
@@ -83,13 +86,20 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=
                                AppendEntries = er_entry_util:make_append_entries(?TYPE_CONFIG, LogEntry, State),
                                NewState = update_config(LogEntry, State),
                                NewReply = er_raft_peer_api:append_entries_config(AppendEntries),
-                               process_leader_entry(NewReply, ?ER_CONFIG_ACCEPTED, ?ER_CONFIG_REJECTED, fun update_config_entry_leader_state/1, NewState)
+                               process_leader_entry(NewReply, 
+                                                    ?ER_CONFIG_ACCEPTED, 
+                                                    ?ER_CONFIG_REJECTED, 
+                                                    fun update_config_entry_leader_state/1, 
+                                                    fun update_config_entry_leader_state/1,
+                                                    NewState)
                            end, 
   event_reply("config_entry.99", NewReply2),
   event_state("config_entry.99", NewState2),
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
-handle_call({?PEER_REQUEST_VOTE, #er_request_vote{vote=Vote, config_entry=ConfigEntry}}, _From, #er_raft_state{status=Status}=State) when Status =/= ?ER_LEADER ->
+handle_call({?PEER_REQUEST_VOTE, #er_request_vote{vote=Vote, config_entry=ConfigEntry}}, 
+            _From, 
+            #er_raft_state{status=Status}=State) when Status =/= ?ER_LEADER ->
   event_state("peer_request_vote.00", State),
   NewState = update_config(ConfigEntry, State),
   {NewReply2, NewState2} = process_vote(Vote, NewState),
@@ -98,8 +108,8 @@ handle_call({?PEER_REQUEST_VOTE, #er_request_vote{vote=Vote, config_entry=Config
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
-                                                         prev_log_term=EntryPrevLogTerm,
-                                                         prev_log_index=EntryPrevLogIndex}=AppendEntries}, 
+                                                         leader_commit_term=EntryCommitTerm,
+                                                         leader_commit_index=EntryCommitIndex}=AppendEntries}, 
             _From, 
             #er_raft_state{status=Status, 
                            leader_id=StateLeaderId, 
@@ -111,10 +121,17 @@ handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
                              true  ->
                                {{error, ?ER_LEADER_STEP_DOWN, StateLeaderId, StateCurrentTerm}, State};
                              false ->
-                               NewState1 = er_raft_state:update_log_entry(update_leader_info(LeaderInfo, State#er_raft_state{status=get_peer_status(State#er_raft_state.status)})),
-                               case (StatePrevLogTerm =:= EntryPrevLogTerm andalso StatePrevLogIndex =:= EntryPrevLogIndex) of
+                               NewState1 = er_raft_state:update_log_entry(update_leader_info(LeaderInfo, 
+                                                                                             State#er_raft_state{status=get_peer_status(State#er_raft_state.status)})),
+                               case acceptable_leader_entry(State, AppendEntries) of
                                  true  ->
-                                   process_peer_log_entry(AppendEntries, NewState1);
+                                   NewState3 = case StatePrevLogTerm =:= EntryCommitTerm andalso StatePrevLogIndex =:= EntryCommitIndex of
+                                                 true  ->
+                                                   NewState1;
+                                                 false ->
+                                                   undo_last_log_entry(NewState1)
+                                               end, 
+                                   process_peer_log_entry(AppendEntries, NewState3);
                                  false ->  
                                    {?ER_REQUEST_SNAPSHOT, NewState1}
                                end
@@ -123,13 +140,13 @@ handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
   event_state("peer_append_entries_op.99", NewState4),
   {reply, NewReply4, NewState4, get_timeout(NewReply4, NewState4)};
 
-handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderInfo}=AppendEntries}, _From, #er_raft_state{status=?ER_NOT_IN_CONFIG}=State) ->
+handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderInfo}=AppendEntries}, 
+            _From, 
+            #er_raft_state{status=?ER_NOT_IN_CONFIG}=State) ->
   event_state("peer_append_entries_config.00", State),
   ConfigEntry = er_util:log_entry_lifo(AppendEntries),
   NewState2 = update_config(ConfigEntry, State),
-  NewReply2 = case {LeaderInfo#er_leader_info.leader_id, 
-                   (NewState2#er_raft_state.prev_log_term =:= AppendEntries#er_append_entries.prev_log_term andalso 
-                    NewState2#er_raft_state.prev_log_index =:= AppendEntries#er_append_entries.prev_log_index)} of
+  NewReply2 = case {LeaderInfo#er_leader_info.leader_id, acceptable_leader_entry(NewState2, AppendEntries)} of
                 {undefined, _} ->
                   ?ER_ENTRY_ACCEPTED;
                 {_, true}      ->
@@ -141,7 +158,9 @@ handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderI
   event_state("peer_append_entries_config.99", NewState2),
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
-handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderInfo}}, _From, #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId, current_term=CurrentTerm}=State) when LeaderId =/= undefined ->
+handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderInfo}}, 
+            _From, 
+            #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId, current_term=CurrentTerm}=State) when LeaderId =/= undefined ->
   event_state("peer_append_entries_config.00", State),
   {NewReply2, NewState2} = case (CurrentTerm > LeaderInfo#er_leader_info.leader_term) of
                              true  ->
@@ -175,19 +194,17 @@ handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo,
   event_state("peer_install_snapshot.99", NewState2),
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
-handle_call(?GET_RAFT_SERVER_STATUS, _From, State) ->
-  Reply = [{status,                   State#er_raft_state.status},
-           {node_id,                  node()},
-           {leader_id,                State#er_raft_state.leader_id},
-           {current_term,             State#er_raft_state.current_term},
-           {prev_log_term,            State#er_raft_state.prev_log_term},
-           {prev_log_index,           State#er_raft_state.prev_log_index},
-           {commit_term,              State#er_raft_state.commit_term},
-           {commit_index,             State#er_raft_state.commit_index},
-           {applied_index,            State#er_raft_state.applied_term},
-           {applied_index,            State#er_raft_state.applied_index},
-           {vote,                     State#er_raft_state.vote}],
-  {reply, Reply, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
+handle_call(?GET_RAFT_SERVER_STATE, _From, State) ->
+  {reply, {node(), State}, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
+
+handle_call({?SET_RAFT_SERVER_STATE, StateList}, _From, State) ->
+  NewState = case lists:keyfind(node(), 1, StateList) of
+               {_, State1} ->
+                 State1;
+               false       ->
+                 State
+             end,
+  {reply, ok, NewState, get_timeout(?ER_ENTRY_ACCEPTED, NewState)};
 
 handle_call(_, _From, #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId}=State) when LeaderId =/= undefined->
   event_state("follower_call.00", State),
@@ -332,7 +349,7 @@ process_install_snapshot(Replies1, InstallSnapshotNodes, ConfigEntry, FinalFlag,
   {Replies2, BadNodes2} = er_raft_peer_api:install_snapshot(InstallSnapshotNodes, RaftSnapshot1),
   er_entry_util:make_reply({Replies1 ++ Replies2, BadNodes2}, ConfigEntry, er_fsm_config:get_optimistic_mode(AppConfig), FinalFlag).
 
-process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, #er_raft_state{config_entry=ConfigEntry, app_config=AppConfig}=NewState1) ->
+process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, RejectFun, #er_raft_state{config_entry=ConfigEntry, app_config=AppConfig}=NewState1) ->
   Reply2 = er_entry_util:make_reply(Reply1, ConfigEntry, er_fsm_config:get_optimistic_mode(AppConfig), false),
   case Reply2 of
     {ok, _}                                                ->
@@ -345,19 +362,20 @@ process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, #er_raft_state{con
           NewState3 = AcceptFun(NewState1),
           {{ok, AcceptMsg}, NewState3};
         _       ->
-          {{error, RejectMsg}, NewState1}
+          {{error, RejectMsg}, RejectFun(NewState1)}
       end;
     {error, {?ER_LEADER_STEP_DOWN, LeaderId, LeaderTerm}} ->
+      NewState2 = RejectFun(NewState1),
       {{error, {?ER_ENTRY_LEADER_ID, LeaderId}}, 
-       update_status_change(?ER_FOLLOWER, NewState1#er_raft_state{leader_id=LeaderId, current_term=LeaderTerm})};
+       update_status_change(?ER_FOLLOWER, NewState2#er_raft_state{leader_id=LeaderId, current_term=LeaderTerm})};
     {error, _}                                            ->
-      {{error, RejectMsg}, NewState1}
+      {{error, RejectMsg}, RejectFun(NewState1)}
   end.
 
 process_leader_log_entry(AppendEntries, State) ->
    {ok, NewState1} = append_log_entry(AppendEntries, State),
    Reply1 = er_raft_peer_api:append_entries_op(AppendEntries),
-   process_leader_entry(Reply1, ?ER_ENTRY_ACCEPTED, ?ER_UNAVAILABLE, fun update_log_entry_leader_state/1, NewState1).
+   process_leader_entry(Reply1, ?ER_ENTRY_ACCEPTED, ?ER_UNAVAILABLE, fun update_log_entry_leader_state/1, fun undo_last_log_entry/1, NewState1).
 
 update_log_entry_leader_state(#er_raft_state{prev_log_term=PrevLogTerm, prev_log_index=PrevLogIndex}=State) ->
   NewState = State#er_raft_state{commit_term=PrevLogTerm, commit_index=PrevLogIndex},
@@ -413,6 +431,20 @@ apply_log_entry(#er_raft_state{commit_term=CommitTerm,
     _                                    ->
       State
   end.
+
+acceptable_leader_entry(#er_raft_state{prev_log_term=StatePrevLogTerm,
+                                       prev_log_index=StatePrevLogIndex}, 
+                        #er_append_entries{leader_commit_term=EntryCommitTerm,
+                                           leader_commit_index=EntryCommitIndex}) ->
+  StatePrevLogTerm >= EntryCommitTerm andalso StatePrevLogIndex >= EntryCommitIndex.
+
+undo_last_log_entry(#er_raft_state{log_entries=LogEntries, unique_id=UniqueId}=State) ->
+  {{value, Entry}, NewLogEntries} = er_queue:take_lifo(LogEntries),
+  NewCmd = Entry#er_log_entry.entry#er_cmd_entry{type=?TYPE_OP_UNCOMMITED},
+  NewEntry = Entry#er_log_entry{entry=NewCmd},
+  {ok, _} = er_replicated_log_api:append_entry(NewEntry),
+  NewUniqueId = er_util:remove_log_entry_id(Entry, UniqueId),
+  State#er_raft_state{log_entries=NewLogEntries, unique_id=NewUniqueId}.
 
 event_state(Msg, State) ->
   er_event:state(?MODULE, Msg, State).

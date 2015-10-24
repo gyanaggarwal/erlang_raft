@@ -23,6 +23,7 @@
          append/2,
          append/1, 
          append_entry/2,
+         append_entry/1,
          append_entry_compact/2, 
          write/2,
          write/1,
@@ -36,7 +37,9 @@
 
 -spec read(Status :: status_input()) -> {ok, queue:queue(), status_output()} | {error, atom()}.
 read(Status) ->
-  er_util:check_call(?RL_SERVER, {read, Status}).
+  {ok, Q0, NewStatus} = er_util:check_call(?RL_SERVER, {read, Status}),
+  Q1 = er_util:remove_uncommited_entries(Q0, 0, 0, er_queue:new()),
+  {ok, Q1, NewStatus}.
 
 -spec read() -> {ok, queue:queue(), status_output()} | {error, atom()}.
 read() ->
@@ -53,6 +56,10 @@ append(Entries) ->
 -spec append_entry(Entry :: #er_log_entry{}, Status :: status_input()) -> {ok, status_output()} | {error, atom(), status_output()}.
 append_entry(Entry, Status) ->
   append(er_queue:insert(Entry, er_queue:new()), Status).
+
+-spec append_entry(Entry :: #er_log_entry{}) -> {ok, status_output()} | {error, atom(), status_output()}.
+append_entry(Entry) ->
+  append_entry(Entry, ?ER_KEEP_STATUS).
 
 -spec append_entry_compact(Entry :: #er_log_entry{}, State :: #er_raft_state{}) -> {ok, queue:queue() | undefined, sets:set() | undefined, status_output()} | {error, atom(), status_output()}.
 append_entry_compact(Entry, #er_raft_state{log_entries=LogEntries, applied_term=AppliedTerm, applied_index=AppliedIndex, app_config=AppConfig}) ->

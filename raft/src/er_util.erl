@@ -20,8 +20,10 @@
 
 -export([get_election_timeout/1, 
          get_node_name/0,
+         get_rest_of_node_name/0,
          get_file_name/3,
          get_temp_file_name/3,
+         get_version_file_name/4,
          check_call/2,
          check_cast/2,
          config_list/1,
@@ -31,8 +33,10 @@
          peer_node_list/1,
          merge_list/2,
          add_log_entry_id/2,
+         remove_log_entry_id/2,
          validate_log_entry_id/2,
          applied_sub_list/7,
+         remove_uncommited_entries/4,
          intersection/3,
          equal_list/2,
          get_last_term_index/1]).
@@ -47,17 +51,27 @@ get_election_timeout({ElectionTimeoutMin, ElectionTimeoutMax}) ->
 get_node_name() ->
   lists:takewhile(fun(X) -> X =/= $@ end, atom_to_list(node())).
 
+-spec get_rest_of_node_name() -> string().
+get_rest_of_node_name() ->
+  lists:dropwhile(fun(X) -> X =/= $@ end, atom_to_list(node())).
+
 -spec get_file_name(NodeName :: string(), DataDir :: string(), FileName :: string()) -> string().
 get_file_name(NodeName, DataDir, FileName) ->
   DataDir ++ NodeName ++ FileName.
 
+-spec get_version_file_name(NodeName :: string(), DataDir :: string(), Version :: string(), FileName :: string()) -> string().
+get_version_file_name(NodeName, DataDir, Version, FileName) ->
+  get_file_name(NodeName, DataDir, get_version_file_name(Version, FileName)).
+
+
 -spec get_temp_file_name(NodeName :: string(), DataDir :: string(), FileName :: string()) -> string().
 get_temp_file_name(NodeName, DataDir, FileName) ->
-  get_file_name(NodeName, DataDir, get_temp_file_name(FileName)).
+  get_version_file_name(NodeName, DataDir, ?TEMP_SUFFIX, FileName).
 
--spec get_temp_file_name(string()) -> string().
-get_temp_file_name(FileName) ->
-  ?TEMP_SUFFIX ++ FileName.
+-spec get_version_file_name(string(), string()) -> string().
+get_version_file_name(Version, FileName) ->
+  Version  ++ FileName.
+
 
 -spec check_call(Server :: atom(), Request :: term()) -> {error, ?ER_UNAVAILABLE} | term().
 check_call(Server, Request) ->
@@ -77,6 +91,21 @@ check_cast(Server, Request) ->
       gen_server:cast(Server, Request)
   end.
 
+-spec remove_id(Entry :: #er_log_entry{}, USet :: sets:set()) -> sets:set().
+remove_id(Entry, USet) ->
+  case cmd_id(Entry) of
+    undefined -> USet;
+    Id        -> case USet of
+                   undefined -> USet;
+                   _         -> sets:del_element(Id, USet)
+                 end
+  end.
+
+-spec remove_log_entry_id(Entry :: #er_log_entry{}, UniqueId :: #er_unique_id{}) -> #er_unique_id{}.
+remove_log_entry_id(Entry, UniqueId) ->
+  LogEntrySet = remove_id(Entry, UniqueId#er_unique_id.log_entries),
+  UniqueId#er_unique_id{log_entries=LogEntrySet}.
+                
 -spec add_id(Entry :: #er_log_entry{}, USet :: sets:set()) -> sets:set().
 add_id(Entry, USet) ->
   case cmd_id(Entry) of
@@ -161,6 +190,26 @@ applied_sub_list(Qi0, CommitTerm, CommitIndex, AppliedTerm, AppliedIndex, MinCou
                              {MinCount, Qo0}
                          end,
       applied_sub_list(Qi1, CommitTerm, CommitIndex, AppliedTerm, AppliedIndex, MinCount1, Qo1)
+  end.
+
+-spec remove_uncommited_entries(Qi0 :: queue:queue(), UncommitedTerm :: non_neg_integer(), UncommitedIndex :: non_neg_integer(), Qo0 :: queue:queue()) -> queue:queue().
+remove_uncommited_entries(Qi0, UncommitedTerm, UncommitedIndex, Qo0) ->
+  case er_queue:is_empty(Qi0) of
+    true  ->
+      Qo0;
+    false ->
+      {{value, #er_log_entry{term=Term, index=Index, entry=#er_cmd_entry{type=Type}}=Entry}, Qi1} = er_queue:take_lifo(Qi0),
+      case Type of
+        ?TYPE_OP            ->
+          case Term =:= UncommitedTerm andalso Index =:= UncommitedIndex of
+            true  ->
+              remove_uncommited_entries(Qi1, 0, 0, Qo0);
+            false ->
+              remove_uncommited_entries(Qi1, 0, 0, er_queue:insert_reverse(Entry, Qo0))
+          end;
+        ?TYPE_OP_UNCOMMITED ->
+          remove_uncommited_entries(Qi1, Term, Index, Qo0)
+      end
   end.
 
 -spec intersection(List1 :: list(), ConfigList :: list(), OutList :: list()) -> list().

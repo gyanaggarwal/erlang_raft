@@ -38,6 +38,13 @@
          get_sup_child_shutdown/1,
          get_log_retention_size/1]).
 
+-export([data_dir/0,
+         file_replicated_log/0,
+         file_metadata/0,
+         sup_restart_intensity/0,
+         sup_restart_period/0,
+         sup_child_shutdown/0]).
+
 -include("er_fsm.hrl").
 
 -define(ELECTION_TIMEOUT_MIN,      10).
@@ -166,5 +173,29 @@ get_file_name(NodeName, DataDir, FileSuffix) ->
   #er_file_name{file_suffix    = FileSuffix,
                 file_name      = er_util:get_file_name(NodeName, DataDir, FileSuffix),
                 temp_file_name = er_util:get_temp_file_name(NodeName, DataDir, FileSuffix)}.
+
+-spec data_dir() -> string().
+data_dir() ->
+  er_config:get_env(erlang_raft, data_dir, ?DATA_DIR).
+
+-spec file_replicated_log() -> string().
+file_replicated_log() ->
+  er_config:get_env(erlang_raft, file_replicated_log, ?FILE_REPLICATED_LOG).
+
+-spec file_metadata() -> string().
+file_metadata() ->
+  er_config:get_env(erlang_raft, file_metadata, ?FILE_METADATA).
+
+-spec sup_restart_intensity() -> non_neg_integer(). 
+sup_restart_intensity() ->
+  er_config:get_env(erlang_raft, sup_restart_intensity, ?SUP_RESTART_INTENSITY).
+
+-spec sup_restart_period() -> non_neg_integer().
+sup_restart_period() ->
+  er_config:get_env(erlang_raft, sup_restart_period, ?SUP_RESTART_PERIOD).
+
+-spec sup_child_shutdown() -> non_neg_integer().
+sup_child_shutdown() ->
+  er_config:get_env(erlang_raft, sup_child_shutdown, ?SUP_CHILD_SHUTDOWN).
 
 

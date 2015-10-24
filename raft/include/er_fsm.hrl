@@ -21,6 +21,7 @@
 -define(TYPE_NOOP,                  0).
 -define(TYPE_CONFIG,                1).
 -define(TYPE_OP,                    2).
+-define(TYPE_OP_UNCOMMITED,         12).
 
 -define(ER_BAD_ENTRY,               er_bad_entry).
 -define(ER_TRUNCATED,               er_truncated).
@@ -60,7 +61,8 @@
 -define(PEER_APPEND_ENTRIES_OP,     peer_append_entries_op).
 -define(PEER_APPEND_ENTRIES_NOOP,   peer_append_entries_noop).
 -define(PEER_APPEND_ENTRIES_CONFIG, peer_append_entries_config).
--define(GET_RAFT_SERVER_STATUS,     get_raft_server_status).
+-define(GET_RAFT_SERVER_STATE,      get_raft_server_state).
+-define(SET_RAFT_SERVER_STATE,      set_raft_server_state).
 
 -record(er_file_name,        {file_suffix               :: string(),
                               file_name                 :: string(),
@@ -87,7 +89,7 @@
                               log_retention_size_max    :: non_neg_integer(),
                               log_retention_size_min    :: non_neg_integer()}).
 
--record(er_cmd_entry,        {type                      :: ?TYPE_CONFIG | ?TYPE_OP,
+-record(er_cmd_entry,        {type                      :: ?TYPE_CONFIG | ?TYPE_OP | ?TYPE_OP_UNCOMMITED,
                               id                        :: term(),
                               cmd                       :: term()}).
 
@@ -150,4 +152,5 @@
                               app_config                :: #er_app_config{}}).
 
 -record(er_peer_state,       {app_config                :: #er_app_config{}}).
+
  

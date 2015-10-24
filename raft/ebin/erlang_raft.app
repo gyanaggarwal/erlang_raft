@@ -22,24 +22,5 @@
   ,{modules, [er_app, er_sup, er_raft_server, er_event, er_peer_server, rl_server]}
   ,{registered, [er_sup, er_raft_server, er_event, er_peer_server, rl_server]}
   ,{applications, [kernel, stdlib]}
-  ,{env, [ {election_timeout_min   , 10}
-          ,{election_timeout_max   , 20}
-          ,{heartbeat_timeout      , 5}
-          ,{log_request_timeout    , 5}
-          ,{log_entry_operation_api, rl_entry_operation_api}
-          ,{log_file_header_version, 1}
-          ,{log_entry_trailer_magic, <<"\xFE\xED\xFE\xED\xFE\xED\xFE\xED">>}
-          ,{state_machine_api      , undefined}
-          ,{data_dir               , ""}
-          ,{file_replicated_log    , "_repl.log"}
-          ,{file_metadata          , "_meta.dat"}
-          ,{file_config            , "_raft.cfg"}
-          ,{optimistic_mode        , true}
-          ,{debug_mode             , false}
-          ,{sup_restart_intensity  , 1}
-          ,{sup_restart_period     , 5}
-          ,{sup_child_shutdown     , 2000}
-          ,{log_retention_size_min , 10}
-          ,{log_retention_size_max , 1000}]}
   ,{mod, {er_app, []}}
  ]}.

@@ -22,11 +22,17 @@
          log_entry/3, 
          config_entry/1, 
          config_entry/2, 
-         get_status/1, 
+         get_status/1,
+         set_status/2, 
          start/0, 
-         stop/0]).
+         stop/0,
+         start_test_env/0,
+         stop_test_env/0,
+         raft_test/0]).
 
 -include("er_fsm.hrl").
+
+-define(ER_TEST_SERVER, er_test_server).
 
 -spec log_entry(Id :: term(), Cmd :: term()) -> term().
 log_entry(Id, Cmd) ->
@@ -48,9 +54,13 @@ config_entry(Node, List) ->
   CmdEntry = cmd_entry(?TYPE_CONFIG, List),
   call_entry(Node, {?CONFIG_ENTRY, CmdEntry}).
 
--spec get_status(Node :: atom()) -> term().
+-spec get_status(Node :: atom()) -> {atom(), #er_raft_state{}}.
 get_status(Node) ->
-  call_entry(Node, ?GET_RAFT_SERVER_STATUS).
+  call_entry(Node, ?GET_RAFT_SERVER_STATE).
+
+-spec set_status(Node :: atom(), StateList :: list()) -> ok.
+set_status(Node, StateList) ->
+  call_entry(Node, {?SET_RAFT_SERVER_STATE, StateList}).
 
 -spec call_entry(Request :: term()) -> term().
 call_entry(Request) ->
@@ -85,3 +95,12 @@ start() ->
 stop() ->
   application:stop(erlang_raft),
   application:stop(state_machine).
+
+start_test_env() ->
+  application:start(erlang_raft_test).
+
+stop_test_env() ->
+  application:stop(erlang_raft_test).
+
+raft_test() ->
+  gen_server:call(?ER_TEST_SERVER, raft_test).
