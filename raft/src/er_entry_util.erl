@@ -71,6 +71,7 @@ make_append_entries(?TYPE_OP, Entry=#er_log_entry{}, State=#er_raft_state{}) ->
                      leader_info=make_leader_info(State#er_raft_state.leader_id, State#er_raft_state.current_term, State#er_raft_state.config_entry),
                      prev_log_term=State#er_raft_state.prev_log_term,
                      prev_log_index=State#er_raft_state.prev_log_index,
+                     prev_log_type=State#er_raft_state.prev_log_type,
                      leader_commit_term=State#er_raft_state.commit_term,
                      leader_commit_index=State#er_raft_state.commit_index,
                      log_entries=Q0}.  

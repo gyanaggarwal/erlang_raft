@@ -108,8 +108,9 @@ handle_call({?PEER_REQUEST_VOTE, #er_request_vote{vote=Vote, config_entry=Config
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
-                                                         leader_commit_term=EntryCommitTerm,
-                                                         leader_commit_index=EntryCommitIndex}=AppendEntries}, 
+                                                         prev_log_term=EntryPrevLogTerm,
+                                                         prev_log_index=EntryPrevLogIndex,
+                                                         prev_log_type=EntryPrevLogType}=AppendEntries}, 
             _From, 
             #er_raft_state{status=Status, 
                            leader_id=StateLeaderId, 
@@ -123,16 +124,18 @@ handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
                              false ->
                                NewState1 = er_raft_state:update_log_entry(update_leader_info(LeaderInfo, 
                                                                                              State#er_raft_state{status=get_peer_status(State#er_raft_state.status)})),
-                               case acceptable_leader_entry(State, AppendEntries) of
-                                 true  ->
-                                   NewState3 = case StatePrevLogTerm =:= EntryCommitTerm andalso StatePrevLogIndex =:= EntryCommitIndex of
+                               case {acceptable_leader_entry(State, AppendEntries), EntryPrevLogType} of
+                                 {true, ?TYPE_OP_UNCOMMITED}  ->               
+                                   NewState3 = case StatePrevLogTerm =:= EntryPrevLogTerm andalso StatePrevLogIndex =:= EntryPrevLogIndex of
                                                  true  ->
-                                                   NewState1;
+                                                   undo_last_log_entry(?TYPE_OP, NewState1);
                                                  false ->
-                                                   undo_last_log_entry(NewState1)
+                                                   NewState1
                                                end, 
                                    process_peer_log_entry(AppendEntries, NewState3);
-                                 false ->  
+                                 {true, _}                    ->
+                                   process_peer_log_entry(AppendEntries, NewState1);
+                                 {false, _}                   ->  
                                    {?ER_REQUEST_SNAPSHOT, NewState1}
                                end
                            end,  
@@ -375,7 +378,7 @@ process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, RejectFun, #er_raf
 process_leader_log_entry(AppendEntries, State) ->
    {ok, NewState1} = append_log_entry(AppendEntries, State),
    Reply1 = er_raft_peer_api:append_entries_op(AppendEntries),
-   process_leader_entry(Reply1, ?ER_ENTRY_ACCEPTED, ?ER_UNAVAILABLE, fun update_log_entry_leader_state/1, fun undo_last_log_entry/1, NewState1).
+   process_leader_entry(Reply1, ?ER_ENTRY_ACCEPTED, ?ER_UNAVAILABLE, fun update_log_entry_leader_state/1, fun undo_leader_last_log_entry/1, NewState1).
 
 update_log_entry_leader_state(#er_raft_state{prev_log_term=PrevLogTerm, prev_log_index=PrevLogIndex}=State) ->
   NewState = State#er_raft_state{commit_term=PrevLogTerm, commit_index=PrevLogIndex},
@@ -412,6 +415,7 @@ append_log_entry(AppendEntries, #er_raft_state{log_entries=LogEntries, unique_id
                  end,
        NewState = State#er_raft_state{prev_log_term=LogEntry#er_log_entry.term,
                                       prev_log_index=LogEntry#er_log_entry.index,
+                                      prev_log_type=?TYPE_OP,
                                       log_entries=Q2,
                                       unique_id=U2},
       {ok, NewState}
@@ -438,13 +442,16 @@ acceptable_leader_entry(#er_raft_state{prev_log_term=StatePrevLogTerm,
                                            leader_commit_index=EntryCommitIndex}) ->
   StatePrevLogTerm >= EntryCommitTerm andalso StatePrevLogIndex >= EntryCommitIndex.
 
-undo_last_log_entry(#er_raft_state{log_entries=LogEntries, unique_id=UniqueId}=State) ->
+undo_last_log_entry(LogEntryType, #er_raft_state{log_entries=LogEntries, unique_id=UniqueId}=State) ->
   {{value, Entry}, NewLogEntries} = er_queue:take_lifo(LogEntries),
   NewCmd = Entry#er_log_entry.entry#er_cmd_entry{type=?TYPE_OP_UNCOMMITED},
   NewEntry = Entry#er_log_entry{entry=NewCmd},
   {ok, _} = er_replicated_log_api:append_entry(NewEntry),
   NewUniqueId = er_util:remove_log_entry_id(Entry, UniqueId),
-  State#er_raft_state{log_entries=NewLogEntries, unique_id=NewUniqueId}.
+  State#er_raft_state{prev_log_type=LogEntryType, log_entries=NewLogEntries, unique_id=NewUniqueId}.
+
+undo_leader_last_log_entry(State) ->
+  undo_last_log_entry(?TYPE_OP_UNCOMMITED, State).
 
 event_state(Msg, State) ->
   er_event:state(?MODULE, Msg, State).

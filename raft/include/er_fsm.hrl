@@ -120,6 +120,7 @@
                               leader_info               :: #er_leader_info{},
                               prev_log_term=0           :: non_neg_integer(),
                               prev_log_index=0          :: non_neg_integer(),
+                              prev_log_type=?TYPE_OP    :: non_neg_integer(),
                               leader_commit_term=0      :: non_neg_integer(),
                               leader_commit_index=0     :: non_neg_integer(),
                               log_entries               :: queue:queue()}).
@@ -140,7 +141,8 @@
                               leader_id                 :: atom(),
                               current_term=0            :: non_neg_integer(),
                               prev_log_term=0           :: non_neg_integer(),
-                              prev_log_index=0          :: non_neg_integer(),      
+                              prev_log_index=0          :: non_neg_integer(),
+                              prev_log_type=?TYPE_OP    :: non_neg_integer(),      
                               commit_term=0             :: non_neg_integer(),
                               commit_index=0            :: non_neg_integer(),
                               applied_term=0            :: non_neg_integer(),

@@ -57,7 +57,8 @@ update_log_entries(#er_snapshot{log_entries=LogEntries, log_stats=LogStats}=Snap
       State#er_raft_state{unique_id=UniqueId,
                           log_entries=LogEntries,
                           prev_log_term=NewTerm,
-                          prev_log_index=NewIndex};
+                          prev_log_index=NewIndex,
+                          prev_log_type=?TYPE_OP};
     false ->
       State
   end.

@@ -48,11 +48,12 @@ handle_info(_Info, State) ->
   {ok, State}.
 
 handle_event({state, {Module, Msg, StateData=#er_raft_state{}}}, State) ->
-  io:format("[~p] ~p status=~p, leader_id=~p, log_entry_count=~p, current_term=~p, prev_log_term=~p, prev_log_index=~p, commit_term=~p, commit_index=~p, applied_term=~p, applied_index=~p~n",
+  io:format("[~p] ~p status=~p, leader_id=~p, log_entry_count=~p, current_term=~p, prev_log_term=~p, prev_log_index=~p, prev_log_type=~p, commit_term=~p, commit_index=~p, applied_term=~p, applied_index=~p~n",
             [Module,                                            Msg, 
              StateData#er_raft_state.status,                    StateData#er_raft_state.leader_id,     
              er_queue:len(StateData#er_raft_state.log_entries), StateData#er_raft_state.current_term,               
              StateData#er_raft_state.prev_log_term,             StateData#er_raft_state.prev_log_index,
+             StateData#er_raft_state.prev_log_type,
              StateData#er_raft_state.commit_term,               StateData#er_raft_state.commit_index,
              StateData#er_raft_state.applied_term,              StateData#er_raft_state.applied_index]),
   {ok, State};
