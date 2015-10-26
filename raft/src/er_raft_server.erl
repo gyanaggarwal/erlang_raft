@@ -269,9 +269,9 @@ get_timeout(Reply, #er_raft_state{status=Status, app_config=AppConfig}) ->
     {_, ?ER_LEADER}           ->
       er_fsm_config:get_heartbeat_timeout(AppConfig);
     {_, ?ER_FOLLOWER}         ->
-      er_util:get_election_timeout(er_fsm_config:get_election_timeout(AppConfig));
+      er_util:get_random(er_fsm_config:get_election_timeout(AppConfig));
     {_, ?ER_CANDIDATE}        -> 
-      er_util:get_election_timeout(er_fsm_config:get_election_timeout(AppConfig));
+      er_util:get_random(er_fsm_config:get_election_timeout(AppConfig));
     {_, _}                    ->
       infinity
   end.

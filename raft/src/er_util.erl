@@ -18,7 +18,7 @@
 
 -module(er_util).
 
--export([get_election_timeout/1, 
+-export([get_random/1, 
          get_node_name/0,
          get_rest_of_node_name/0,
          get_file_name/3,
@@ -43,9 +43,9 @@
 
 -include("er_fsm.hrl").
 
--spec get_election_timeout({ElectionTimeoutMin :: non_neg_integer(), ElectionTimeoutMax :: non_neg_integer()}) -> non_neg_integer().
-get_election_timeout({ElectionTimeoutMin, ElectionTimeoutMax}) ->
-  random:uniform(ElectionTimeoutMax-ElectionTimeoutMin)+ElectionTimeoutMin.
+-spec get_random({Min :: non_neg_integer(), Max :: non_neg_integer()}) -> non_neg_integer().
+get_random({Min, Max}) ->
+  random:uniform(Max-Min)+Min.
 
 -spec get_node_name() -> string().
 get_node_name() ->
@@ -62,7 +62,6 @@ get_file_name(NodeName, DataDir, FileName) ->
 -spec get_version_file_name(NodeName :: string(), DataDir :: string(), Version :: string(), FileName :: string()) -> string().
 get_version_file_name(NodeName, DataDir, Version, FileName) ->
   get_file_name(NodeName, DataDir, get_version_file_name(Version, FileName)).
-
 
 -spec get_temp_file_name(NodeName :: string(), DataDir :: string(), FileName :: string()) -> string().
 get_temp_file_name(NodeName, DataDir, FileName) ->
