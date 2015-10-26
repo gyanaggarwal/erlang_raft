@@ -25,7 +25,8 @@
          read_config/1,
          read_vote/1,
          delete_config/1,
-         delete_vote/1]).
+         delete_vote/1,
+         copy_data/2]).
 
 -include("er_fsm.hrl").
 
@@ -71,4 +72,25 @@ read_vote(AppConfig) ->
 delete_vote(AppConfig) ->
   FileName = er_fsm_config:get_file_metadata(AppConfig),
   er_persist_data:delete_data(FileName#er_file_name.file_name, FileName#er_file_name.temp_file_name).
+
+-spec copy_data(AppConfig :: #er_app_config{}, {BkupFlag :: ?CREATE_BKUP | ?RESTORE_BKUP, DeleteRaftData :: true | false, FileVersion :: string()}) -> ok.
+copy_data(AppConfig, {BkupFlag, DeleteRaftData, FileVersion}) ->
+  DataDir = er_fsm_config:get_data_dir(AppConfig),
+  FileMetadata = er_fsm_config:get_file_metadata(AppConfig),
+  NodeName = er_util:get_node_name(),
+  FileName1 = FileMetadata#er_file_name.file_name,
+  FileName2 = er_util:get_version_file_name(NodeName, DataDir, FileVersion, FileMetadata#er_file_name.file_suffix),
+  {SrcFileName, TrgFileName} = case BkupFlag of
+                                 ?CREATE_BKUP  ->             
+                                   {FileName1, FileName2};
+                                 ?RESTORE_BKUP ->
+                                   {FileName2, FileName1}
+                               end, 
+  ok = er_persist_data:copy_data(SrcFileName, TrgFileName),
+  case DeleteRaftData of
+    true  ->
+      file:delete(SrcFileName);
+    false ->
+      ok
+  end.  
 

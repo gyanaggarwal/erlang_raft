@@ -24,7 +24,8 @@
          delete_log_file/1,
          write_log/3, 
          read_log/3, 
-         truncate_log/2]).
+         truncate_log/2,
+         copy_log_file/3]).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -97,3 +98,13 @@ read_log(File, Location, Size) ->
     {ok, _} = file:position(File, Pos),
     file:truncate(File).
 
+-spec copy_log_file(FileName :: string(), TrgFileName :: string(), DeleteRaftData :: true | false) -> ok | {error, atom()}.
+copy_log_file(FileName, TrgFileName, DeleteRaftData) ->
+  ok = delete_log_file(TrgFileName),
+  {ok, _} = file:copy(FileName, TrgFileName),
+  case DeleteRaftData of
+    true  ->
+      delete_log_file(FileName);
+    false ->
+      ok
+  end.

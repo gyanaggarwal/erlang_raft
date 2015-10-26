@@ -200,14 +200,21 @@ handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo,
 handle_call(?GET_RAFT_SERVER_STATE, _From, State) ->
   {reply, {node(), State}, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
 
-handle_call({?SET_RAFT_SERVER_STATE, StateList}, _From, State) ->
+handle_call({?SET_RAFT_SERVER_STATE, {StateList, FileVersion}}, _From, #er_raft_state{app_config=AppConfig}=State) ->
   NewState = case lists:keyfind(node(), 1, StateList) of
                {_, State1} ->
                  State1;
                false       ->
                  State
              end,
+  er_persist_data_api:copy_data(AppConfig, {?RESTORE_BKUP, false, FileVersion}),
+  er_replicated_log_api:copy({?RESTORE_BKUP, false, FileVersion}),
   {reply, ok, NewState, get_timeout(?ER_ENTRY_ACCEPTED, NewState)};
+
+handle_call({?BKUP_RAFT_SERVER_STATE, {DeleteRaftData, FileVersion}}, _From, #er_raft_state{app_config=AppConfig}=State) ->
+  er_persist_data_api:copy_data(AppConfig, {?CREATE_BKUP, DeleteRaftData, FileVersion}),
+  er_replicated_log_api:copy({?CREATE_BKUP, DeleteRaftData, FileVersion}),
+  {reply, State, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
 
 handle_call(_, _From, #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId}=State) when LeaderId =/= undefined->
   event_state("follower_call.00", State),

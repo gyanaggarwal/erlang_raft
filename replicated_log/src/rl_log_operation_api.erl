@@ -25,7 +25,8 @@
          read/2,
          last_entry/2,
          append/4, 
-         write/5]).
+         write/5,
+         copy/6]).
 
 -spec open(AppConfig :: #er_app_config{}, FileName :: string()) -> {ok, file:io_device(), non_neg_integer()} | {error, atom()}.
 open(AppConfig, FileName) ->
@@ -113,6 +114,22 @@ last_entry(AppConfig, File) ->
       {Status, ?ER_EMPTY};
     {value, Entry} ->
       {Status, Entry}
+  end.
+
+-spec copy(AppConfig :: #er_app_config{},
+           BkupFlag :: ?CREATE_BKUP | ?RESTORE_BKUP, 
+           FileName :: string(), 
+           TrgFileName :: string(), 
+           File :: file:io_device(), 
+           DeleteRaftData :: true | false) -> {ok, file:io_device(), non_neg_integer()} | {error, atom()}.
+copy(AppConfig, BkupFlag, FileName, TrgFileName, File, DeleteRaftData) ->
+  ok = close(AppConfig, File),
+  ok = rl_persist_log:copy_log_file(FileName, TrgFileName, DeleteRaftData),
+  case BkupFlag of
+    ?CREATE_BKUP  ->
+      open(AppConfig, FileName);
+    ?RESTORE_BKUP -> 
+      open(AppConfig, TrgFileName)
   end.
 
 

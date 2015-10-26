@@ -28,7 +28,8 @@
          write/2,
          write/1,
          last_entry/1,
-         last_entry/0]).
+         last_entry/0,
+         copy/1]).
 
 -include("er_fsm.hrl").
 
@@ -44,6 +45,10 @@ read(Status) ->
 -spec read() -> {ok, queue:queue(), status_output()} | {error, atom()}.
 read() ->
   read(?ER_STABLE).
+
+-spec copy({BkupFlag :: ?CREATE_BKUP | ?RESTORE_BKUP, DeleteRaftData :: true | false, FileVersion :: string()}) -> ok | {error, atom()}.
+copy({BkupFlag, DeleteRaftData, FileVersion}) ->
+  er_util:check_call(?RL_SERVER, {copy, {BkupFlag, DeleteRaftData, FileVersion}}).
 
 -spec append(Entries :: queue:queue(), Status :: status_input()) -> {ok, status_output()} | {error, atom(), status_output()}.
 append(Entries, Status) ->

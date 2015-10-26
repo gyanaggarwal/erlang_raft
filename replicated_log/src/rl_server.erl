@@ -72,7 +72,20 @@ handle_call({last_entry, Status}, _From, #er_replicated_log{file=File, app_confi
                            Status1 = new_status(Status, CurrStatus),
                            {{ok, Entry, Status1}, Status1}
                        end,
-  {reply, Reply, State#er_replicated_log{status=NewStatus}}.
+  {reply, Reply, State#er_replicated_log{status=NewStatus}};
+handle_call({copy, {BkupFlag, DeleteRaftData, FileVersion}}, _From, #er_replicated_log{file=File, app_config=AppConfig}=State) ->
+  RLFileName = er_fsm_config:get_file_replicated_log(AppConfig),
+  DataDir = er_fsm_config:get_data_dir(AppConfig),
+  NodeName = er_util:get_node_name(),
+  FileName2 = er_util:get_version_file_name(NodeName, DataDir, FileVersion, RLFileName#er_file_name.file_suffix),
+  {SrcFileName, TrgFileName} = case BkupFlag of
+                                 ?CREATE_BKUP  ->
+                                   {RLFileName#er_file_name.file_name, FileName2};
+                                 ?RESTORE_BKUP ->
+                                   {FileName2, RLFileName#er_file_name.file_name}
+                               end,
+  {ok, NewFile, _} = rl_log_operation_api:copy(AppConfig, BkupFlag, SrcFileName, TrgFileName, File, DeleteRaftData),
+  {reply, ok, State#er_replicated_log{file=NewFile}}.
   
 handle_cast(_, State) ->
   {noreply, State}.

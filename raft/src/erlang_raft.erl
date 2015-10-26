@@ -21,18 +21,12 @@
 -export([log_entry/2, 
          log_entry/3, 
          config_entry/1, 
-         config_entry/2, 
-         get_status/1,
-         set_status/2, 
+         config_entry/2,
+         make_node_names/0, 
          start/0, 
-         stop/0,
-         start_test_env/0,
-         stop_test_env/0,
-         raft_test/0]).
+         stop/0]).
 
 -include("er_fsm.hrl").
-
--define(ER_TEST_SERVER, er_test_server).
 
 -spec log_entry(Id :: term(), Cmd :: term()) -> term().
 log_entry(Id, Cmd) ->
@@ -53,14 +47,6 @@ log_entry(Node, Id, Cmd) ->
 config_entry(Node, List) ->
   CmdEntry = cmd_entry(?TYPE_CONFIG, List),
   call_entry(Node, {?CONFIG_ENTRY, CmdEntry}).
-
--spec get_status(Node :: atom()) -> {atom(), #er_raft_state{}}.
-get_status(Node) ->
-  call_entry(Node, ?GET_RAFT_SERVER_STATE).
-
--spec set_status(Node :: atom(), StateList :: list()) -> ok.
-set_status(Node, StateList) ->
-  call_entry(Node, {?SET_RAFT_SERVER_STATE, StateList}).
 
 -spec call_entry(Request :: term()) -> term().
 call_entry(Request) ->
@@ -96,11 +82,7 @@ stop() ->
   application:stop(erlang_raft),
   application:stop(state_machine).
 
-start_test_env() ->
-  application:start(erlang_raft_test).
-
-stop_test_env() ->
-  application:stop(erlang_raft_test).
-
-raft_test() ->
-  gen_server:call(?ER_TEST_SERVER, raft_test).
+make_node_names() ->
+  Nodes = ["er_n1", "er_n2", "er_n3", "er_n4", "er_n5"],
+  RestOfNode = er_util:get_rest_of_node_name(),
+  lists:foldl(fun(X, Acc) -> [list_to_atom(X ++ RestOfNode) | Acc] end, [], Nodes).

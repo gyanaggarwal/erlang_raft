@@ -18,7 +18,7 @@
 
 -module(er_persist_data).
 
--export([write_data/3, read_data/2, delete_data/2]).
+-export([write_data/3, read_data/2, delete_data/2, copy_data/2]).
 
 -include("er_fsm.hrl").
 
@@ -55,3 +55,15 @@ read_data(FileName, TempFileName) ->
 delete_data(FileName, TempFileName) ->
   set_data_file(FileName, TempFileName),
   file:delete(FileName).
+
+-spec copy_data(SrcFileName :: string(), TrgFileName :: string()) -> ok | {error, atom()}.
+copy_data(SrcFileName, TrgFileName) ->
+  file:delete(TrgFileName),
+  case file:copy(SrcFileName, TrgFileName) of
+    {ok, _}         ->
+      ok;
+    {error, enoent} ->
+      ok;
+    {error, Reason} ->
+      {error, Reason}
+  end.

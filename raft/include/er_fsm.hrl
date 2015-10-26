@@ -23,6 +23,9 @@
 -define(TYPE_OP,                    2).
 -define(TYPE_OP_UNCOMMITED,         12).
 
+-define(CREATE_BKUP,                0).
+-define(RESTORE_BKUP,               1).
+
 -define(ER_BAD_ENTRY,               er_bad_entry).
 -define(ER_TRUNCATED,               er_truncated).
 -define(ER_STABLE,                  er_stable).
@@ -63,6 +66,7 @@
 -define(PEER_APPEND_ENTRIES_CONFIG, peer_append_entries_config).
 -define(GET_RAFT_SERVER_STATE,      get_raft_server_state).
 -define(SET_RAFT_SERVER_STATE,      set_raft_server_state).
+-define(BKUP_RAFT_SERVER_STATE,     bkup_raft_server_state).
 
 -record(er_file_name,        {file_suffix               :: string(),
                               file_name                 :: string(),
