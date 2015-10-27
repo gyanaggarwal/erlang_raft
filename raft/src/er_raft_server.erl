@@ -198,7 +198,7 @@ handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo,
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call(?GET_RAFT_SERVER_STATE, _From, State) ->
-  {reply, {node(), State}, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
+  {reply, State, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
 
 handle_call({?SET_RAFT_SERVER_STATE, {StateList, FileVersion}}, _From, #er_raft_state{app_config=AppConfig}=State) ->
   NewState = case lists:keyfind(node(), 1, StateList) of
