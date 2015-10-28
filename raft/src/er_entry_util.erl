@@ -84,14 +84,15 @@ make_install_snapshot(Snapshot, #er_raft_state{leader_id=LeaderId, current_term=
 make_reply({Replies, _BadNodes}, ConfigEntry, OptimisticMode, FinalFlag) ->
   NodeReply = make_node_reply(Replies, #node_reply{}),
   ConfigList = er_util:config_list(ConfigEntry),
-  make_output_reply(NodeReply, ConfigList, FinalFlag, OptimisticMode).
+  NodeReply2 = filter_node_reply(NodeReply, ConfigList),
+  make_output_reply(NodeReply2, ConfigList, FinalFlag, OptimisticMode).
 
 -spec make_node_reply(Replies :: list(),  NodeReply :: #node_reply{}) -> #node_reply{}.
 make_node_reply([{Node, Reply} | TReplies], NodeReply) ->
   NewNodeReply = case Reply of
                    ?ER_ENTRY_ACCEPTED                           ->
                      NodeReply#node_reply{er_entry_accepted=[{Node, Reply} | NodeReply#node_reply.er_entry_accepted]};
-                   {?ER_LEADER_STEP_DOWN, LeaderId, LeaderTerm} ->
+                   {?ER_LEADER_STEP_DOWN, {LeaderId, LeaderTerm}} ->
                      NodeReply#node_reply{er_leader_step_down=[{Node, {LeaderId, LeaderTerm}} | NodeReply#node_reply.er_leader_step_down]}; 
                    ?ER_ENTRY_REJECTED                           ->
       		     NodeReply#node_reply{er_entry_rejected=[Node | NodeReply#node_reply.er_entry_rejected]};
@@ -121,8 +122,8 @@ make_output_reply(NodeReply, ConfigList, FinalFlag, OptimisticMode) ->
       [{_, LeaderId} | _] = NodeReply#node_reply.er_entry_leader_id,  
       {error, {?ER_ENTRY_LEADER_ID, LeaderId}};
     {true, false, true}  ->
-      [{_, LeaderId, LeaderTerm} | _] = NodeReply#node_reply.er_leader_step_down,
-      {error, {?ER_LEADER_STEP_DOWN, LeaderId, LeaderTerm}};
+      [{_, {LeaderId, LeaderTerm}} | _] = NodeReply#node_reply.er_leader_step_down,
+      {error, {?ER_LEADER_STEP_DOWN, {LeaderId, LeaderTerm}}};
     {true, false, false} ->
       LenAccepted = length(NodeReply#node_reply.er_entry_accepted),
       LenSnapshot = length(NodeReply#node_reply.er_request_snapshot),
@@ -152,6 +153,16 @@ total_reply(NodeReply) ->
   length(NodeReply#node_reply.er_entry_leader_id)+
   length(NodeReply#node_reply.er_leader_step_down)+
   length(NodeReply#node_reply.error).
+
+-spec filter_node_reply(NodeReply :: #node_reply{}, ConfigList :: list()) -> #node_reply{}.
+filter_node_reply(NodeReply, ConfigList) ->
+  NodeReply#node_reply{er_entry_accepted=er_util:key_intersection(NodeReply#node_reply.er_entry_accepted, ConfigList, []),
+                       er_entry_rejected=er_util:intersection(NodeReply#node_reply.er_entry_rejected, ConfigList, []),
+                       er_request_snapshot=er_util:intersection(NodeReply#node_reply.er_request_snapshot, ConfigList, []),
+                       er_entry_leader_id=er_util:key_intersection(NodeReply#node_reply.er_entry_leader_id, ConfigList, []),
+                       er_leader_step_down=er_util:key_intersection(NodeReply#node_reply.er_leader_step_down, ConfigList, []),
+                       error=er_util:key_intersection(NodeReply#node_reply.error, ConfigList, [])}.
+
   
 -spec make_leader_info(LeaderId :: atom(), LeaderTerm :: non_neg_integer(), ConfigEntry :: #er_log_entry{}) -> #er_leader_info{}.
 make_leader_info(LeaderId, LeaderTerm, ConfigEntry) ->

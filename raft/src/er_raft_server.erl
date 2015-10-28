@@ -58,7 +58,7 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_NOT_IN_C
   NewState = update_config(LogEntry, State),
   {NewReply2, NewState2} = case NewState#er_raft_state.status of
                              ?ER_FOLLOWER ->
-                               NewReply = er_raft_peer_api:append_entries_config(AppendEntries),
+                               NewReply = er_raft_peer_api:append_entries_config(undefined, AppendEntries),
                                NewReply1 = er_entry_util:make_reply(NewReply, 
                                                                     NewState#er_raft_state.config_entry, 
                                                                     er_fsm_config:get_optimistic_mode(NewState#er_raft_state.app_config), 
@@ -85,7 +85,7 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=
                              false ->
                                AppendEntries = er_entry_util:make_append_entries(?TYPE_CONFIG, LogEntry, State),
                                NewState = update_config(LogEntry, State),
-                               NewReply = er_raft_peer_api:append_entries_config(AppendEntries),
+                               NewReply = er_raft_peer_api:append_entries_config(CurrentConfigEntry, AppendEntries),
                                process_leader_entry(NewReply, 
                                                     ?ER_CONFIG_ACCEPTED, 
                                                     ?ER_CONFIG_REJECTED, 
@@ -120,7 +120,7 @@ handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
   event_state("peer_append_entries_op.00", State),
   {NewReply4, NewState4} = case (StateCurrentTerm > LeaderInfo#er_leader_info.leader_term) of
                              true  ->
-                               {{error, ?ER_LEADER_STEP_DOWN, StateLeaderId, StateCurrentTerm}, State};
+                               {{error, ?ER_LEADER_STEP_DOWN, {StateLeaderId, StateCurrentTerm}}, State};
                              false ->
                                NewState1 = er_raft_state:update_log_entry(update_leader_info(LeaderInfo, 
                                                                                              State#er_raft_state{status=get_peer_status(State#er_raft_state.status)})),
@@ -167,7 +167,7 @@ handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderI
   event_state("peer_append_entries_config.00", State),
   {NewReply2, NewState2} = case (CurrentTerm > LeaderInfo#er_leader_info.leader_term) of
                              true  ->
-                               {{error, {?ER_LEADER_STEP_DOWN, LeaderId, CurrentTerm}}, State};
+                               {{error, {?ER_LEADER_STEP_DOWN, {LeaderId, CurrentTerm}}}, State};
                              false ->
                                {?ER_ENTRY_ACCEPTED, update_leader_info(LeaderInfo, State)}
                            end,
@@ -214,7 +214,13 @@ handle_call({?SET_RAFT_SERVER_STATE, {StateList, FileVersion}}, _From, #er_raft_
 handle_call({?BKUP_RAFT_SERVER_STATE, {DeleteRaftData, FileVersion}}, _From, #er_raft_state{app_config=AppConfig}=State) ->
   er_persist_data_api:copy_data(AppConfig, {?CREATE_BKUP, DeleteRaftData, FileVersion}),
   er_replicated_log_api:copy({?CREATE_BKUP, DeleteRaftData, FileVersion}),
-  {reply, State, State, get_timeout(?ER_ENTRY_ACCEPTED, State)};
+  NewState = case DeleteRaftData of
+               true  ->
+                 #er_raft_state{app_config=AppConfig};
+               false ->
+                 State
+             end,
+  {reply, State, NewState, get_timeout(?ER_ENTRY_ACCEPTED, NewState)};
 
 handle_call(_, _From, #er_raft_state{status=?ER_FOLLOWER, leader_id=LeaderId}=State) when LeaderId =/= undefined->
   event_state("follower_call.00", State),
@@ -374,7 +380,7 @@ process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, RejectFun, #er_raf
         _       ->
           {{error, RejectMsg}, RejectFun(NewState1)}
       end;
-    {error, {?ER_LEADER_STEP_DOWN, LeaderId, LeaderTerm}} ->
+    {error, {?ER_LEADER_STEP_DOWN, {LeaderId, LeaderTerm}}} ->
       NewState2 = RejectFun(NewState1),
       {{error, {?ER_ENTRY_LEADER_ID, LeaderId}}, 
        update_status_change(?ER_FOLLOWER, NewState2#er_raft_state{leader_id=LeaderId, current_term=LeaderTerm})};

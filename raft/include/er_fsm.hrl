@@ -68,6 +68,9 @@
 -define(SET_RAFT_SERVER_STATE,      set_raft_server_state).
 -define(BKUP_RAFT_SERVER_STATE,     bkup_raft_server_state).
 
+-define(ER_VALID_STATE,             er_valid_state).
+-define(ER_INVALID_STATE,           er_invalid_state).
+
 -record(er_file_name,        {file_suffix               :: string(),
                               file_name                 :: string(),
                               temp_file_name            :: string()}).

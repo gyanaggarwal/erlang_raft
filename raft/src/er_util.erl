@@ -38,6 +38,7 @@
          applied_sub_list/7,
          remove_uncommited_entries/4,
          intersection/3,
+         key_intersection/3,
          equal_list/2,
          get_last_term_index/1]).
 
@@ -221,6 +222,18 @@ intersection([Node | TList], ConfigList, OutList) ->
                end,
   intersection(TList, ConfigList, NewOutList);
 intersection([], _ConfigList, OutList) ->
+  OutList.
+
+-spec key_intersection(List1 :: list(), ConfigList :: list(), OutList :: list()) -> list().
+key_intersection([{Node, Value} | TList], ConfigList, OutList) ->
+  NewOutList = case lists:member(Node, ConfigList) of
+                 true  ->
+                   [{Node, Value} | OutList];
+                 false ->
+                   OutList
+               end,
+  key_intersection(TList, ConfigList, NewOutList);
+key_intersection([], _ConfigList, OutList) ->
   OutList.
 
 -spec equal_list(List1 :: list(), List2 :: list()) -> boolean().
