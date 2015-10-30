@@ -70,6 +70,10 @@
 
 -define(ER_VALID_STATE,             er_valid_state).
 -define(ER_INVALID_STATE,           er_invalid_state).
+-define(ER_CONFIG_STATE,            er_config_state).
+-define(ER_NOT_IN_CONFIG_STATE,     er_not_in_config_state).
+-define(ER_LOG_INDEX_STATE,         er_log_index_state).
+-define(ER_LOG_ENTRIES_STATE,       er_log_entries_state).
 
 -record(er_file_name,        {file_suffix               :: string(),
                               file_name                 :: string(),

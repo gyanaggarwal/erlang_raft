@@ -1,0 +1,42 @@
+
+prev_test_result
+   test_case_no=9, leader_id='er_n5@Gyanendras-MacBook-Pro', config=['er_n1@Gyanendras-MacBook-Pro',
+                                                                     'er_n5@Gyanendras-MacBook-Pro',
+                                                                     'er_n4@Gyanendras-MacBook-Pro'], log_entries=17
+   config_state=er_valid_state, not_in_config_state=er_valid_state, log_index_state=er_valid_state, log_entries_state=er_valid_state
+
+initial_state
+   node='er_n3@Gyanendras-MacBook-Pro', status=er_not_in_config, leader_id=undefined, current_term=4, prev_log_term=4, prev_log_index=131, commit_term=4, commit_index=130
+   node='er_n2@Gyanendras-MacBook-Pro', status=er_not_in_config, leader_id=undefined, current_term=3, prev_log_term=3, prev_log_index=115, commit_term=3, commit_index=115
+   node='er_n1@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=131, commit_term=4, commit_index=130
+   node='er_n5@Gyanendras-MacBook-Pro', status=er_leader, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=131, commit_term=4, commit_index=131
+   node='er_n4@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=2, prev_log_index=73, commit_term=2, commit_index=72
+
+final_state
+   node='er_n3@Gyanendras-MacBook-Pro', status=er_not_in_config, leader_id=undefined, current_term=4, prev_log_term=4, prev_log_index=131, commit_term=4, commit_index=130
+   node='er_n2@Gyanendras-MacBook-Pro', status=er_not_in_config, leader_id=undefined, current_term=3, prev_log_term=3, prev_log_index=115, commit_term=3, commit_index=115
+   node='er_n1@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=148, commit_term=4, commit_index=147
+   node='er_n5@Gyanendras-MacBook-Pro', status=er_leader, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=148, commit_term=4, commit_index=148
+   node='er_n4@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=2, prev_log_index=73, commit_term=2, commit_index=72
+
+curr_test_result
+   test_case_no=10, leader_id='er_n5@Gyanendras-MacBook-Pro', config=['er_n3@Gyanendras-MacBook-Pro',
+                                                                      'er_n2@Gyanendras-MacBook-Pro',
+                                                                      'er_n1@Gyanendras-MacBook-Pro',
+                                                                      'er_n5@Gyanendras-MacBook-Pro',
+                                                                      'er_n4@Gyanendras-MacBook-Pro'], log_entries=16
+   config_state=er_valid_state, not_in_config_state=er_valid_state, log_index_state=er_valid_state, log_entries_state=er_valid_state
+
+initial_state
+   node='er_n3@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=131, commit_term=4, commit_index=130
+   node='er_n2@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=3, prev_log_index=115, commit_term=3, commit_index=115
+   node='er_n1@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=148, commit_term=4, commit_index=147
+   node='er_n5@Gyanendras-MacBook-Pro', status=er_leader, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=148, commit_term=4, commit_index=148
+   node='er_n4@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=2, prev_log_index=73, commit_term=2, commit_index=72
+
+final_state
+   node='er_n3@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=164, commit_term=4, commit_index=163
+   node='er_n2@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=164, commit_term=4, commit_index=163
+   node='er_n1@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=164, commit_term=4, commit_index=163
+   node='er_n5@Gyanendras-MacBook-Pro', status=er_leader, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=164, commit_term=4, commit_index=164
+   node='er_n4@Gyanendras-MacBook-Pro', status=er_follower, leader_id='er_n5@Gyanendras-MacBook-Pro', current_term=4, prev_log_term=4, prev_log_index=164, commit_term=4, commit_index=163

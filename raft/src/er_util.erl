@@ -39,6 +39,13 @@
          remove_uncommited_entries/4,
          intersection/3,
          key_intersection/3,
+         pred_list/2,
+         pred_not_list/2,
+         acc_list/2,
+         pred_tuplelist/2,
+         pred_not_tuplelist/2,
+         acc_tuplelist/2,
+         filter_list/5,
          equal_list/2,
          get_last_term_index/1]).
 
@@ -71,7 +78,6 @@ get_temp_file_name(NodeName, DataDir, FileName) ->
 -spec get_version_file_name(string(), string()) -> string().
 get_version_file_name(Version, FileName) ->
   Version  ++ FileName.
-
 
 -spec check_call(Server :: atom(), Request :: term()) -> {error, ?ER_UNAVAILABLE} | term().
 check_call(Server, Request) ->
@@ -212,28 +218,48 @@ remove_uncommited_entries(Qi0, UncommitedTerm, UncommitedIndex, Qo0) ->
       end
   end.
 
--spec intersection(List1 :: list(), ConfigList :: list(), OutList :: list()) -> list().
-intersection([Node | TList], ConfigList, OutList) ->
-  NewOutList = case lists:member(Node, ConfigList) of
-                 true  ->
-                   [Node | OutList];
-                 false ->
-                   OutList
-               end,
-  intersection(TList, ConfigList, NewOutList);
-intersection([], _ConfigList, OutList) ->
-  OutList.
+-spec pred_list(Node :: term(), List :: list()) -> true | false.
+pred_list(Node, List) ->
+  lists:member(Node, List).
 
--spec key_intersection(List1 :: list(), ConfigList :: list(), OutList :: list()) -> list().
-key_intersection([{Node, Value} | TList], ConfigList, OutList) ->
-  NewOutList = case lists:member(Node, ConfigList) of
+-spec pred_not_list(Node :: term(), List :: list()) -> true | false.
+pred_not_list(Node, List) ->
+  (not lists:member(Node, List)).
+
+-spec acc_list(Node :: term(), List :: list()) -> list().
+acc_list(Node, List) ->
+  [Node | List].
+
+- spec pred_tuplelist(tuple(), list()) -> true | false.
+pred_tuplelist({Node, _}, List)	->
+  pred_list(Node, List).
+
+- spec pred_not_tuplelist(tuple(), list()) -> true | false.
+pred_not_tuplelist({Node, _}, List) ->
+  pred_not_list(Node, List).
+
+-spec acc_tuplelist(tuple(), list()) -> list().
+acc_tuplelist({_, Value}, List) ->
+  acc_list(Value, List).
+
+-spec intersection(List :: list(), ConfigList :: list(), OutList :: list()) -> list().
+intersection(List, ConfigList, OutList) ->
+  filter_list(List, ConfigList, OutList, fun pred_list/2, fun acc_list/2).
+
+-spec key_intersection(List :: list(), ConfigList :: list(), OutList :: list()) -> list().
+key_intersection(List, ConfigList, OutList) ->
+  filter_list(List, ConfigList, OutList, fun pred_tuplelist/2, fun acc_list/2).
+
+-spec filter_list(List :: list(), RefList :: list(), OutList :: list(), PredFun :: fun(), AccFun :: fun()) -> list().
+filter_list([H | T], RefList, OutList, PredFun, AccFun) ->
+  NewOutList = case PredFun(H, RefList) of
                  true  ->
-                   [{Node, Value} | OutList];
+                   AccFun(H, OutList);
                  false ->
                    OutList
                end,
-  key_intersection(TList, ConfigList, NewOutList);
-key_intersection([], _ConfigList, OutList) ->
+  filter_list(T, RefList, NewOutList, PredFun, AccFun);
+filter_list([], _, OutList, _, _) ->
   OutList.
 
 -spec equal_list(List1 :: list(), List2 :: list()) -> boolean().
