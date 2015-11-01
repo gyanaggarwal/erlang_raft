@@ -20,23 +20,15 @@
 
 -behavior(er_state_machine).
 
--export([read/0, update/1, write/1]).
+-export([update/1]).
 
 -include("er_fsm.hrl").
 
 -define(SERVER, sm_server).
 
--spec read() -> {non_neg_integer(), non_neg_integer(), term()}.
-read() ->
-  gen_server:call(?SERVER, read).
-
 -spec update(Q0 :: queue:queue()) -> {non_neg_integer(), non_neg_integer(), term()}.
 update(Q0) ->
-  gen_server:call(?SERVER, {update_sync, make_cmd_list(Q0, [])}).
-
--spec write({Term :: non_neg_integer(), Index :: non_neg_integer(), Data :: term()}) -> {non_neg_integer(), non_neg_integer(), term()}.
-write({Term, Index, Data}) ->
-  gen_server:call(?SERVER, {write, {Term, Index, Data}}).
+  gen_server:call(?SERVER, {update, make_cmd_list(Q0, [])}).
 
 make_cmd_list(Q0, L0) ->
   case er_queue:take_fifo(Q0) of

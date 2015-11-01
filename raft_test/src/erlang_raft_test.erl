@@ -22,10 +22,21 @@
          set_state/2,
          copy_state/2,
          raft_test/9,
+         raft_test/0,
          test_print/1]).
 
 -include("er_fsm.hrl").
 -include("er_test.hrl").
+
+-define(RAFT_NODES,         [er_n1, er_n2, er_n3, er_n4, er_n5]).
+-define(INITIAL_NODES,      [er_n1, er_n2, er_n3]).
+-define(SLEEP_TIME,         5000).
+-define(CONFIG_CHANGE_MIN,  10).
+-define(CONFIG_CHANGE_MAX,  30).
+-define(FULL_CONFIG_CHANGE, 3).
+-define(LOG_ENTRIES_MIN,    20).
+-define(LOG_ENTRIES_MAX,    50).
+-define(RESULT_FILE_NAME,   "raft_test_results.txt").
 
 -spec get_state(Nodes :: list()) -> list().
 get_state(Nodes) ->
@@ -70,6 +81,17 @@ raft_test(RaftNodes,
                                      LogEntriesMax),
   TestResults = er_test_run:run_test(AppConfig),
   er_test_results:print(FileName, TestResults).
+
+raft_test() ->
+  raft_test(?RAFT_NODES,
+            ?INITIAL_NODES,
+            ?SLEEP_TIME,
+            ?CONFIG_CHANGE_MIN,
+            ?CONFIG_CHANGE_MAX,
+            ?FULL_CONFIG_CHANGE,
+            ?LOG_ENTRIES_MIN,
+            ?LOG_ENTRIES_MAX,
+            ?RESULT_FILE_NAME).
 
 test_print(FileName) ->
   PrevTestStatus = #er_test_status{},

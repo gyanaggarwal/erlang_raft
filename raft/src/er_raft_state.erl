@@ -36,14 +36,8 @@
 -include("er_fsm.hrl").
 
 update_state(Snapshot, State) ->
-  State1 = update_state_machine(Snapshot, State),
-  State2 = update_voted_for(Snapshot, State1),
-  update_log_entries(Snapshot, State2).
-
-update_state_machine(#er_snapshot{state_machine={Term, Index, _Data}}, State) ->
-  State#er_raft_state{commit_term=Term, commit_index=Index, applied_term=Term, applied_index=Index};
-update_state_machine(_, State) ->
-  State.
+  State1 = update_voted_for(Snapshot, State),
+  update_log_entries(Snapshot, State1).
 
 update_voted_for(#er_snapshot{voted_for=Vote}, State) ->
   update_voted_for(Vote, State);
@@ -123,8 +117,8 @@ validate_config_state(_, undefined) ->
   {?ER_INVALID_STATE, ?ER_CONFIG_STATE};
 validate_config_state([#er_raft_state{status=?ER_LEADER} | Rest], LeaderState) ->
   validate_config_state(Rest, LeaderState);
-validate_config_state([#er_raft_state{status=?ER_FOLLOWER, current_term=CurrentTerm, leader_id=LeaderId} | Rest], 
-                       #er_raft_state{current_term=CurrentTerm, leader_id=LeaderId}=LeaderState) ->
+validate_config_state([#er_raft_state{status=?ER_FOLLOWER, current_term=CurrentTerm, leader_id=LeaderId, prev_log_index=FollowerLogIndex} | Rest], 
+                       #er_raft_state{current_term=CurrentTerm, leader_id=LeaderId, prev_log_index=LeaderLogIndex}=LeaderState) when LeaderLogIndex >= FollowerLogIndex ->
   validate_config_state(Rest, LeaderState);
 validate_config_state([#er_raft_state{status=?ER_FOLLOWER} | _], _) ->
   {?ER_INVALID_STATE, ?ER_CONFIG_STATE};

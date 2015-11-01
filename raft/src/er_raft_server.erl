@@ -91,6 +91,7 @@ handle_call({?CONFIG_ENTRY, CmdEntry}, _From, #er_raft_state{status=?ER_LEADER}=
                                                     ?ER_CONFIG_REJECTED, 
                                                     fun update_config_entry_leader_state/1, 
                                                     fun update_config_entry_leader_state/1,
+                                                    false,
                                                     NewState)
                            end, 
   event_reply("config_entry.99", NewReply2),
@@ -176,15 +177,12 @@ handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderI
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
 handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo, 
-                                                  state_machine=StateMachineData, 
                                                   log_entries=LogEntries, 
                                                   voted_for=Vote}=Snapshot}, 
             _From, 
             #er_raft_state{status=Status, app_config=AppConfig}=State) when Status =/= ?ER_LEADER ->
   event_state("peer_install_snapshot.00", State),
   er_persist_data_api:write_vote(AppConfig, Vote),
-  StateMachineApi = er_fsm_config:get_state_machine_api(AppConfig),
-  StateMachineApi:write(StateMachineData),
   {NewReply2, NewState2} = case er_replicated_log_api:write(LogEntries) of 
                              {ok, _}            ->
                                NewState = update_leader_info(LeaderInfo, State),
@@ -365,8 +363,8 @@ process_install_snapshot(Replies1, InstallSnapshotNodes, ConfigEntry, FinalFlag,
   {Replies2, BadNodes2} = er_raft_peer_api:install_snapshot(InstallSnapshotNodes, RaftSnapshot1),
   er_entry_util:make_reply({Replies1 ++ Replies2, BadNodes2}, ConfigEntry, er_fsm_config:get_optimistic_mode(AppConfig), FinalFlag).
 
-process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, RejectFun, #er_raft_state{config_entry=ConfigEntry, app_config=AppConfig}=NewState1) ->
-  Reply2 = er_entry_util:make_reply(Reply1, ConfigEntry, er_fsm_config:get_optimistic_mode(AppConfig), false),
+process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, RejectFun, ReplyMode, #er_raft_state{config_entry=ConfigEntry}=NewState1) ->
+  Reply2 = er_entry_util:make_reply(Reply1, ConfigEntry, ReplyMode, false),
   case Reply2 of
     {ok, _}                                                ->
       NewState2 = AcceptFun(NewState1),
@@ -388,10 +386,16 @@ process_leader_entry(Reply1, AcceptMsg, RejectMsg, AcceptFun, RejectFun, #er_raf
       {{error, RejectMsg}, RejectFun(NewState1)}
   end.
 
-process_leader_log_entry(AppendEntries, State) ->
+process_leader_log_entry(AppendEntries, #er_raft_state{app_config=AppConfig}=State) ->
    {ok, NewState1} = append_log_entry(AppendEntries, State),
    Reply1 = er_raft_peer_api:append_entries_op(AppendEntries),
-   process_leader_entry(Reply1, ?ER_ENTRY_ACCEPTED, ?ER_UNAVAILABLE, fun update_log_entry_leader_state/1, fun undo_leader_last_log_entry/1, NewState1).
+   process_leader_entry(Reply1, 
+                        ?ER_ENTRY_ACCEPTED, 
+                        ?ER_UNAVAILABLE, 
+                        fun update_log_entry_leader_state/1, 
+                        fun undo_leader_last_log_entry/1, 
+                        er_fsm_config:get_optimistic_mode(AppConfig), 
+                        NewState1).
 
 update_log_entry_leader_state(#er_raft_state{prev_log_term=PrevLogTerm, prev_log_index=PrevLogIndex}=State) ->
   NewState = State#er_raft_state{commit_term=PrevLogTerm, commit_index=PrevLogIndex},

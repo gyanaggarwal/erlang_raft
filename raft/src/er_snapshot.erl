@@ -26,28 +26,18 @@
 
 -spec raft_snapshot(AppConfig :: #er_app_config{}) -> {ok, #er_snapshot{}}.
 raft_snapshot(AppConfig) ->
-  RequestSnapshot = #er_snapshot{state_machine=?ER_REQUEST, log_entries=?ER_REQUEST, log_stats=?ER_REQUEST, voted_for=?ER_REQUEST},
+  RequestSnapshot = #er_snapshot{log_entries=?ER_REQUEST, log_stats=?ER_REQUEST, voted_for=?ER_REQUEST},
   read_snapshot(AppConfig, RequestSnapshot).
 
 -spec raft_log_entry(AppConfig :: #er_app_config{}) -> {ok, #er_snapshot{}}.
 raft_log_entry(AppConfig) ->
-  RequestSnapshot = #er_snapshot{state_machine=?ER_REQUEST, log_entries=?ER_REQUEST, log_stats=?ER_REQUEST},
+  RequestSnapshot = #er_snapshot{log_entries=?ER_REQUEST, log_stats=?ER_REQUEST},
   read_snapshot(AppConfig, RequestSnapshot).
 
 -spec raft_vote(AppConfig :: #er_app_config{}) -> {ok, #er_snapshot{}}.
 raft_vote(AppConfig) ->
   RequestSnapshot = #er_snapshot{voted_for=?ER_REQUEST},
   read_snapshot(AppConfig, RequestSnapshot).
-
--spec read_state_machine(AppConfig :: #er_app_config{}, Snapshot :: #er_snapshot{}) ->  #er_snapshot{}.
-read_state_machine(AppConfig, Snapshot) ->
-  case Snapshot#er_snapshot.state_machine of
-    ?ER_REQUEST ->
-      StateMachine = er_fsm_config:get_state_machine_api(AppConfig),
-      Snapshot#er_snapshot{state_machine=StateMachine:read()};
-    _Other      ->
-      Snapshot
-  end.
 
 -spec read_voted_for(AppConfig :: #er_app_config{}, Snapshot :: #er_snapshot{}) -> #er_snapshot{}.
 read_voted_for(AppConfig, Snapshot) ->
@@ -85,6 +75,5 @@ read_log_entries(_AppConfig, Snapshot) ->
 
 -spec read_snapshot(AppConfig :: #er_app_config{}, Snapshot :: #er_snapshot{}) -> {ok, #er_snapshot{}} | {error, atom()}.
 read_snapshot(AppConfig, Snapshot) ->
-  Snapshot1 = read_state_machine(AppConfig, Snapshot),
-  Snapshot2 = read_voted_for(AppConfig, Snapshot1),
-  {ok, read_log_entries(AppConfig, Snapshot2)}.
+  Snapshot1 = read_voted_for(AppConfig, Snapshot),
+  {ok, read_log_entries(AppConfig, Snapshot1)}.
