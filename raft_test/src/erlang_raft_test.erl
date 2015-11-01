@@ -31,9 +31,9 @@
 -define(RAFT_NODES,         [er_n1, er_n2, er_n3, er_n4, er_n5]).
 -define(INITIAL_NODES,      [er_n1, er_n2, er_n3]).
 -define(SLEEP_TIME,         5000).
--define(CONFIG_CHANGE_MIN,  10).
--define(CONFIG_CHANGE_MAX,  30).
--define(FULL_CONFIG_CHANGE, 3).
+-define(CONFIG_CHANGE_MIN,  50).
+-define(CONFIG_CHANGE_MAX,  70).
+-define(FULL_CONFIG_CHANGE, 7).
 -define(LOG_ENTRIES_MIN,    20).
 -define(LOG_ENTRIES_MAX,    50).
 -define(RESULT_FILE_NAME,   "raft_test_results.txt").

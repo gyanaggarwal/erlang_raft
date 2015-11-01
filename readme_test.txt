@@ -99,12 +99,12 @@ Issue this command 3 more times, just change the value of last parameter, as giv
 
 At this time, you will see the following for LEADER node:
 
-[er_raft_server] "log_entry.99" status=er_leader, leader_id='er_n1@Gyanendras-MacBook-Pro', log_entry_count=4, 
-current_term=1, prev_log_term=1, prev_log_index=4, commit_term=1, commit_index=4, applied_term=1, applied_index=4
+[er_raft_server] "log_entry.99" status=er_leader, leader_id='er_n1@Gyanendras-MacBook-Pro', current_term=1, 
+prev_log_term=1, prev_log_index=4, commit_term=1, commit_index=4, applied_term=1, applied_index=4
 
 Both FOLLOWER nodes will have the following display:
 
-[er_raft_server] "peer_append_entries_op.99" status=er_follower, leader_id='er_n1@Gyanendras-MacBook-Pro', log_entry_count=4, 
+[er_raft_server] "peer_append_entries_op.99" status=er_follower, leader_id='er_n1@Gyanendras-MacBook-Pro', 
 current_term=1, prev_log_term=1, prev_log_index=4, commit_term=1, commit_index=3, applied_term=1, applied_index=3
 
 Here LEADER node will always 1 entry ahead of FOLLOWER node because it can commit the latest entry 
@@ -135,7 +135,7 @@ If this has been set to true then Ern3 will not become current because LEADER ca
 the quorum requirement just with node Ern2. This is the default setting right now. This leads to
 faster normal operation.
 
-If you have set this value to false then Ern3 will become current immediatley after the first log entry.
+If you have set this value to false then Ern3 will become current immediately after the first log entry.
 
 Let us assume we are testing it with optimistic_mode set to true.
 
@@ -168,12 +168,145 @@ in your log_entry command because it is not an active node now. So, make a suita
 and make these 4 entries.
 
 Once you make these 4 entries, you will notice something strange. Every thing looks ok but 
-you log_entry_count has reduced. If you check the file size of you replicated files, they have 
-also reduced. It is because, it compacts the log files after it reaches a perticular limit as
-specified in sys.config (log_retention_size_max). We have set to 15 for demo/testing purpose
-but normally this value will be much higher.
+file size of your replicated files are reduced. It is because, it compacts the log files after
+it reaches a particular limit as specified in sys.config (log_retention_size_max). 
+We have set to 15 for demo/testing purpose but normally this value will be much higher.
 
 Well this should be a happy ending of testing. If you see any discrepancy, please report back.
+
+
+Automated Testing
+=================
+
+This implementation of RAFT supports the following features:
+
+1. Leader Election
+2. Replicated Log
+3. Config Change
+4. Log Compaction
+5. Snapshot Installation
+
+Log Compaction is performed automatically when we make log entries and log file size exceeds 
+a specific log entry size. 
+
+Snapshot Installation is performed automatically as a part of log entries and also as a part 
+of config change.
+
+So we do not need to create any test cases to test these 2 features. If other features work 
+correctly, we can be sure that these 2 features are also working correctly.
+
+We create a random number of test cases and each test case is selected randomly from the
+following 5 test scenario.
+
+We assume that we are going to use N number of RAFT nodes (Full Configuration) for testing 
+and we start our RAFT cluster with M number of RAFT nodes (Initial Configuration, M =< N).
+
+Each test case starts with RAFT cluster configuration change, so we randomly choose one of 
+the 5 scenarios as configuration change for next test case. The 5 test scenarios are:
+
+1. Current LEADER will be retained and 1 RAFT node from current RAFT cluster will be 
+   replaced by 1 new RAFT node that is NOT_IN_CONFG. 
+2. Current LEADER will be retained and 2 RAFT nodes from current RAFT cluster will be
+   replaced by 2 new RAFT nodes that are NOT_IN_CONFIG.
+
+These test cases help to determine if RAFT implementation performed Config Change correctly 
+or not and also every RAFT node in new RAFT cluster is consistent (possibly by installing 
+the snapshot if needed).
+
+3. Current LEADER is removed and replaced by 1 new RAFT node that is NOT_IN_CONFIG.
+4. Current LEADER and 1 more RAFT node from current cluster are removed and replaced by
+   2 new RAFT nodes that are NOT_IN_CONFIG.
+
+These test cases help to determine if RAFT implementation performed Leader Election correctly
+or not in addition to Config Change.
+
+5. Bring all the RAFT nodes to cluster (Full Configuration).
+
+This test case helps to determine that all the RAFT nodes eventually become consistent.
+
+A Test Case
+===========
+
+We perform the following tasks and make validation for correctness for each test:
+
+1. Make a Config Change as specified in the test case 
+   and validate the following properties
+   
+   a. There is only 1 LEADER in the new configuration and rest of the nodes in the 
+      configuration are FOLLOWER.
+   b. Value of current_term and leader_id is same for every RAFT node in the new configuration.
+   c. Value of prev_log_index for FOLLOWERs is =< value of prev_log_index of LEADER, this property 
+      ensures that the right LEADER was chosen if Leader Election was performed.
+   d. All other RAFT nodes that are not in new configuration must have their status as NOT_IN_CONFIG
+      and leader_id undefined.
+
+2. Make N number of log entries (N is randomly chosen for each test case) 
+   and validate the following properties
+  
+   a. Value of prev_log_index is same for majority of RAFT nodes (including LEADER).
+   b. For majority of FOLLOWERS, commit_index (FOLLOWER) is =< commit_index (LEADER)
+      and commit_index (FOLLOWER) >= commit_index-1 (LEADER).
+   c. For LEADER, value of prev_log_index after making N entries should be equal to
+      prev_log_index value of LEADER just after Config Change + N.
+
+Note : if we have 5 RAFT nodes in our configuration then majority of nodes will constitute 
+       of 1 LEADER and at least 2 FOLLOWRs.
+
+How to run automated test
+=========================
+
+Use raft_erl.sh to start er_n1, er_n2, er_n3, er_n4, er_n5 erlang shell.
+
+Use erlang_raft:start() to start a RAFT node in each erlang shell.
+
+Use raft_el.sh er_nz to start another erlang shell, this shell will be used to start the automated test.
+
+Run erlang_raft_test:raft_test() to perform automated test. It uses the following parameter to run the test.
+If you want to run for a different of set of parameters, you can use another function in the same module
+where you can specify them as part of function invocation.
+
+Parameters used by this function are.
+
+RAFT_NODES         : sname of the nodes that participate in this test (Full Configuration)
+
+INITIAL_NODES      : sname of the nodes that participate in the first test case
+
+SLEEP_TIME         : this time is given in milliseconds, if a Leader Election happens because
+                     of Config Change, it needs to wait for Leader Election process to complete
+                     before it can proceed further testing
+
+CONFIG_CHANGE_MIN  :
+CONFIG_CHANGE_MAX  : These 2 parameters are used to generate a random number that is in the range of
+                     MIN and MAX value.If this value is N then we generate N number of test cases. 
+                     In this N number of test cases, when we are creating test case, we randomly select
+                     a test scenario (from first 4 scenarios) and insert Full Configuration test cases
+                     in between.
+                     
+FULL_CONFIG_CHANGE : Minimum value of this parameter should be 1. 
+                     This parameter denotes the number of times a Full Configuration should be 
+                     introduced in the automated test. Last test case is always Full Configuration.
+                     If this value is more than 1 then we introduce this value -1 Full Configuration
+                     test cases in between other test cases.
+
+LOG_ENTRIES_MIN    :
+LOG_ENTRIES_MAX    : These 2 parameters are used a generate a random number that is in the range of
+                     MIN and MAX value. This random value is generated for each test case and 
+                     this random number specifies the number of log entries we need to make for 
+                     that test case
+ 
+RESULT_FILE_NAME   : This parameter is the name of the file where we save test results.
+
+Once you finish your automated test run and you should see the following line under cur_test_result
+section.
+  
+config_state=er_valid_state, not_in_config_state=er_valid_state, 
+log_index_state=er_valid_state, log_entries_state=er_valid_state
+
+This indicates the RAFT implementation successfully passed the testing, if you see any thing different,
+please report back your results.
+
+
+  
 
 
   
