@@ -36,19 +36,19 @@ init([AppConfig]) ->
   
 handle_call({?REQUEST_VOTE, RequestVote}, _From, #er_peer_state{app_config=AppConfig}=State) ->
   PeerNodeList = peer_node_list(RequestVote),
-  Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_REQUEST_VOTE, RequestVote}),
-  {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)};
+  Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_REQUEST_VOTE, RequestVote}, er_fsm_config:get_log_request_timeout(AppConfig)),
+  {reply, Reply, State};
 handle_call({?APPEND_ENTRIES_OP, AppendEntries}, _From, #er_peer_state{app_config=AppConfig}=State) ->
   PeerNodeList = peer_node_list(AppendEntries),
-  Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_APPEND_ENTRIES_OP, AppendEntries}),
-  {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)};
+  Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_APPEND_ENTRIES_OP, AppendEntries}, er_fsm_config:get_log_request_timeout(AppConfig)),
+  {reply, Reply, State};
 handle_call({?APPEND_ENTRIES_CONFIG, OldConfigEntry, AppendEntries}, _From, #er_peer_state{app_config=AppConfig}=State) ->
   PeerNodeList = peer_node_list(OldConfigEntry, AppendEntries),
-  Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_APPEND_ENTRIES_CONFIG, AppendEntries}),
-  {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)};
+  Reply = gen_server:multi_call(PeerNodeList, ?ER_RAFT_SERVER, {?PEER_APPEND_ENTRIES_CONFIG, AppendEntries}, er_fsm_config:get_log_request_timeout(AppConfig)),
+  {reply, Reply, State};
 handle_call({?INSTALL_SNAPSHOT, {NodeList, Snapshot}}, _From, #er_peer_state{app_config=AppConfig}=State) ->
-  Reply = gen_server:multi_call(NodeList, ?ER_RAFT_SERVER, {?PEER_INSTALL_SNAPSHOT, Snapshot}),
-  {reply, Reply, State, er_fsm_config:get_log_request_timeout(AppConfig)}.
+  Reply = gen_server:multi_call(NodeList, ?ER_RAFT_SERVER, {?PEER_INSTALL_SNAPSHOT, Snapshot}, er_fsm_config:get_log_request_timeout(AppConfig)),
+  {reply, Reply, State}.
 
 handle_cast({?APPEND_ENTRIES_NOOP, AppendEntries}, State) ->
   PeerNodeList = peer_node_list(AppendEntries),
