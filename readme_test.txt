@@ -267,6 +267,11 @@ where you can specify them as part of function invocation.
 
 Parameters used by this function are.
 
+GENERATE_NODE_NAME : true -> user has given only sname for next 2 parameters so it will
+                     generate actual node names. This is possible only when we are testing
+                     this on a single machine.
+                     false -> user has given actual node names.
+
 RAFT_NODES         : sname of the nodes that participate in this test (Full Configuration)
 
 INITIAL_NODES      : sname of the nodes that participate in the first test case

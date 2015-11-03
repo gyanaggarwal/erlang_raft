@@ -18,7 +18,7 @@
 
 -module(er_test_config).
 
--export([get_env/8,
+-export([get_env/9,
          get_raft_nodes/1,
          get_initial_nodes/1,
          get_sleep_time/1,
@@ -28,7 +28,8 @@
 
 -include("er_test.hrl").
 
-get_env(RaftNodes,
+get_env(GenerateNodeName,
+        RaftNodes,
         InitialNodes,
         SleepTime, 
         ConfigChangeMin, 
@@ -36,8 +37,14 @@ get_env(RaftNodes,
         FullConfigChange,
         LogEntriesMin, 
         LogEntriesMax) ->
-  #er_test_config{raft_nodes            = get_nodes(RaftNodes),
-                  initial_nodes         = get_nodes(InitialNodes),
+  {NewRaftNodes, NewInitialNodes} = case GenerateNodeName of
+                                      true  ->
+                                        {get_nodes(RaftNodes), get_nodes(InitialNodes)};
+                                      false ->
+                                        {RaftNodes, InitialNodes}
+                                    end, 
+  #er_test_config{raft_nodes            = NewRaftNodes,
+                  initial_nodes         = NewInitialNodes,
        		  sleep_time  		= SleepTime,
                   config_change_min     = ConfigChangeMin,
                   config_change_max     = ConfigChangeMax,

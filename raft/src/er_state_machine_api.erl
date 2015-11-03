@@ -20,7 +20,7 @@
 
 -behavior(er_state_machine).
 
--export([update/1]).
+-export([update/1, read/0, write/1]).
 
 -include("er_fsm.hrl").
 
@@ -29,6 +29,14 @@
 -spec update(Q0 :: queue:queue()) -> {non_neg_integer(), non_neg_integer(), term()}.
 update(Q0) ->
   gen_server:call(?SERVER, {update, make_cmd_list(Q0, [])}).
+
+-spec read() -> {non_neg_integer(), non_neg_integer(), term()}.
+read() ->
+  gen_server:call(?SERVER, read).
+
+-spec write({Term :: non_neg_integer(), Index :: non_neg_integer(), Data :: term()}) -> {non_neg_integer(), non_neg_integer(), term()}.
+write({Term, Index, Data}) ->
+  gen_server:call(?SERVER, {write, {Term, Index, Data}}).
 
 make_cmd_list(Q0, L0) ->
   case er_queue:take_fifo(Q0) of

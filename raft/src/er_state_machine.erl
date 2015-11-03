@@ -20,4 +20,8 @@
 
 -callback update(Q0 :: queue:queue()) -> {non_neg_integer(), non_neg_integer(), term()}.
 
+-callback read() -> {non_neg_integer(), non_neg_integer(), term()}.
+ 
+-callback write({Term :: non_neg_integer(), Index :: non_neg_integer(), Data :: term()}) -> {non_neg_integer(), non_neg_integer(), term()}.
+ 
 

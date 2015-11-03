@@ -21,13 +21,14 @@
 -export([get_state/1,
          set_state/2,
          copy_state/2,
-         raft_test/9,
+         raft_test/10,
          raft_test/0,
          test_print/1]).
 
 -include("er_fsm.hrl").
 -include("er_test.hrl").
 
+-define(GENERATE_NODE_NAME, true).
 -define(RAFT_NODES,         [er_n1, er_n2, er_n3, er_n4, er_n5]).
 -define(INITIAL_NODES,      [er_n1, er_n2, er_n3]).
 -define(SLEEP_TIME,         5000).
@@ -53,7 +54,8 @@ copy_state(Nodes, {DeleteRaftData, FileVersion}) ->
   {Replies, _} = gen_server:multi_call(Nodes, ?ER_RAFT_SERVER, {?BKUP_RAFT_SERVER_STATE, {DeleteRaftData, FileVersion}}),
   Replies.
 
--spec raft_test(RaftNodes :: list(),
+-spec raft_test(GenerateNodeName :: true | false,
+                RaftNodes :: list(),
                 InitialNodes :: list(),
                 SleepTime :: non_neg_integer(),
                 ConfigChangeMin :: non_neg_integer(),
@@ -62,7 +64,8 @@ copy_state(Nodes, {DeleteRaftData, FileVersion}) ->
                 LogEntriesMin :: non_neg_integer(),
                 LogEntriesMax :: non_neg_integer(),
                 FileName :: string()) -> term().
-raft_test(RaftNodes,
+raft_test(GenerateNodeName,
+          RaftNodes,
           InitialNodes,
       	  SleepTime, 
       	  ConfigChangeMin, 
@@ -71,7 +74,8 @@ raft_test(RaftNodes,
       	  LogEntriesMin, 
           LogEntriesMax,
           FileName) ->
-  AppConfig = er_test_config:get_env(RaftNodes,
+  AppConfig = er_test_config:get_env(GenerateNodeName,
+                                     RaftNodes,
                                      InitialNodes,
                                      SleepTime, 
                                      ConfigChangeMin, 
@@ -83,7 +87,8 @@ raft_test(RaftNodes,
   er_test_results:print(FileName, TestResults).
 
 raft_test() ->
-  raft_test(?RAFT_NODES,
+  raft_test(?GENERATE_NODE_NAME,
+            ?RAFT_NODES,
             ?INITIAL_NODES,
             ?SLEEP_TIME,
             ?CONFIG_CHANGE_MIN,

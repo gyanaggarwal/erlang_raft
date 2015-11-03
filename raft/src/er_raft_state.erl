@@ -36,8 +36,14 @@
 -include("er_fsm.hrl").
 
 update_state(Snapshot, State) ->
-  State1 = update_voted_for(Snapshot, State),
-  update_log_entries(Snapshot, State1).
+  State1 = update_state_machine(Snapshot, State),
+  State2 = update_voted_for(Snapshot, State1),
+  update_log_entries(Snapshot, State2).
+
+update_state_machine(#er_snapshot{state_machine={Term, Index, _Data}}, State) ->
+  State#er_raft_state{commit_term=Term, commit_index=Index, applied_term=Term, applied_index=Index};
+update_state_machine(_, State) ->
+  State.
 
 update_voted_for(#er_snapshot{voted_for=Vote}, State) ->
   update_voted_for(Vote, State);

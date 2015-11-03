@@ -139,6 +139,7 @@
 -record(er_unique_id,        {log_entries=sets:new()    :: sets:set()}).
 
 -record(er_snapshot,         {leader_info               :: #er_leader_info{},
+                              state_machine             :: undefined | ?ER_REQUEST | ?ER_EMPTY | term(),
                               voted_for                 :: undefined | ?ER_REQUEST | ?ER_EMPTY | #er_vote{},
                               log_entries               :: undefined | ?ER_REQUEST | ?ER_EMPTY | queue:queue(),
                               log_stats                 :: undefined | ?ER_REQUEST,

@@ -176,13 +176,16 @@ handle_call({?PEER_APPEND_ENTRIES_CONFIG, #er_append_entries{leader_info=LeaderI
   event_state("peer_append_entries_config.99", NewState2),
   {reply, NewReply2, NewState2, get_timeout(NewReply2, NewState2)};
 
-handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo, 
+handle_call({?PEER_INSTALL_SNAPSHOT, #er_snapshot{leader_info=LeaderInfo,
+                                                  state_machine=StateMachineData, 
                                                   log_entries=LogEntries, 
                                                   voted_for=Vote}=Snapshot}, 
             _From, 
             #er_raft_state{status=Status, app_config=AppConfig}=State) when Status =/= ?ER_LEADER ->
   event_state("peer_install_snapshot.00", State),
   er_persist_data_api:write_vote(AppConfig, Vote),
+  StateMachineApi = er_fsm_config:get_state_machine_api(AppConfig),
+  StateMachineApi:write(StateMachineData),
   {NewReply2, NewState2} = case er_replicated_log_api:write(LogEntries) of 
                              {ok, _}            ->
                                NewState = update_leader_info(LeaderInfo, State),
