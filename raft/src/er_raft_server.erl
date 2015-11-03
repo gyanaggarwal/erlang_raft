@@ -119,7 +119,8 @@ handle_call({?PEER_APPEND_ENTRIES_OP, #er_append_entries{leader_info=LeaderInfo,
                            prev_log_term=StatePrevLogTerm,
                            prev_log_index=StatePrevLogIndex}=State) when Status =/= ?ER_LEADER ->
   event_state("peer_append_entries_op.00", State),
-  {NewReply4, NewState4} = case (StateCurrentTerm > LeaderInfo#er_leader_info.leader_term) of
+  LogEntry = er_util:log_entry_lifo(AppendEntries),
+  {NewReply4, NewState4} = case (StateCurrentTerm > LeaderInfo#er_leader_info.leader_term orelse StatePrevLogIndex >= LogEntry#er_log_entry.index) of
                              true  ->
                                {{error, ?ER_LEADER_STEP_DOWN, {StateLeaderId, StateCurrentTerm}}, State};
                              false ->
@@ -422,23 +423,16 @@ process_peer_log_entry(#er_append_entries{leader_commit_term=LeaderCommitTerm,
 append_log_entry(AppendEntries, #er_raft_state{log_entries=LogEntries, unique_id=UniqueId}=State) ->
   LogEntry = er_util:log_entry_lifo(AppendEntries),
   case er_replicated_log_api:append_entry_compact(LogEntry, State) of
-    {error, Reason, _}              ->
+    {error, Reason, _}                ->
       {{error, Reason}, State};
-    {ok, Q0, S0, _} ->
-      {Q2, U2} = case er_queue:is_queue(Q0) of
-                   false ->
-                     Q1 = er_queue:insert(LogEntry, LogEntries),
-                     U1 = er_util:add_log_entry_id(LogEntry, UniqueId),
-                     {Q1, U1};
-                   true  ->
-                     {Q0, UniqueId#er_unique_id{log_entries=S0}}
-                 end,
-       NewState = State#er_raft_state{prev_log_term=LogEntry#er_log_entry.term,
-                                      prev_log_index=LogEntry#er_log_entry.index,
-                                      prev_log_type=?TYPE_OP,
-                                      log_entries=Q2,
-                                      unique_id=U2},
-      {ok, NewState}
+    #er_snapshot{log_stats=undefined} ->
+      {ok, State#er_raft_state{prev_log_term=LogEntry#er_log_entry.term,
+                               prev_log_index=LogEntry#er_log_entry.index,
+                               prev_log_type=?TYPE_OP,
+                               log_entries=er_queue:insert(LogEntry, LogEntries),
+                               unique_id=er_util:add_log_entry_id(LogEntry, UniqueId)}};
+    Snapshot                          ->
+      {ok, er_raft_state:update_state(Snapshot, State)}
   end.
 
 apply_log_entry(#er_raft_state{commit_term=CommitTerm,
