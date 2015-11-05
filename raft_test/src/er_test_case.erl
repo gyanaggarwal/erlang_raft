@@ -24,6 +24,9 @@
 -include("er_fsm.hrl").
 -include("er_test.hrl").
 
+-define(FAILED,    failed).
+-define(SUCCEEDED, succeeded).
+
 test_case(TestCaseNo, LeaderId, Config, LogEntries, SleepTime, FullConfig) ->
   erlang_raft:config_entry(LeaderId, Config),
   timer:sleep(SleepTime),
@@ -49,8 +52,10 @@ test_case(TestCaseNo, LeaderId, Config, LogEntries, SleepTime, FullConfig) ->
       LeaderState1 = er_raft_state:get_leader_state(ConfigStates1),
       TestStatus1 = TestStatus#er_test_status{log_index_state=er_raft_state:validate_log_index_state(ConfigStates1, LeaderState1),
                                               log_entries_state=er_raft_state:validate_log_entries_state(LeaderState, LeaderState1, LogEntries)},
+      test_and_print(TestCaseNo, TestStatus1),
       TestResult#er_test_result{test_status=TestStatus1, final_state=FinalStates};
    false ->
+      print(TestCaseNo, ?FAILED),
       TestResult
    end.
 
@@ -60,4 +65,14 @@ valid_state(#er_test_status{config_state=?ER_VALID_STATE, not_in_config_state=?E
   true;
 valid_state(_) ->
   false.
+
+print(TestCaseNo, Result) ->
+  io:fwrite("test_case_no=~p  ~p~n", [TestCaseNo, Result]).
+
+test_and_print(TestCaseNo, TestStatus) ->
+  Result = case valid_state(TestStatus) of
+             true  -> ?SUCCEEDED;
+             false -> ?FAILED
+           end,
+  print(TestCaseNo, Result).
 
