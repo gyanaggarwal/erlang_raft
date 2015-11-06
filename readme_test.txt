@@ -276,6 +276,9 @@ RAFT_NODES         : sname of the nodes that participate in this test (Full Conf
 
 INITIAL_NODES      : sname of the nodes that participate in the first test case
 
+SET_STATE_ON_FAIURE: If this value is set to true and if a test case fails then it sets the 
+                     state of RAFT cluster to the final state of previous successful test case.
+
 SLEEP_TIME         : this time is given in milliseconds, if a Leader Election happens because
                      of Config Change, it needs to wait for Leader Election process to complete
                      before it can proceed further testing

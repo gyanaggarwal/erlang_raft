@@ -30,6 +30,7 @@
 
 -record(er_test_config,      {raft_nodes                :: list(),
                               initial_nodes             :: list(),
+                              set_state_on_failure      :: true | false,
                               sleep_time                :: non_neg_integer(),
                               config_change_min         :: non_neg_integer(),
 			      config_change_max		:: non_neg_integer(),

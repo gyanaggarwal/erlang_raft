@@ -18,9 +18,10 @@
 
 -module(er_test_config).
 
--export([get_env/9,
+-export([get_env/10,
          get_raft_nodes/1,
          get_initial_nodes/1,
+         get_set_state_on_failure/1,
          get_sleep_time/1,
          get_full_config_change/1,
          get_config_change/1,
@@ -31,6 +32,7 @@
 get_env(GenerateNodeName,
         RaftNodes,
         InitialNodes,
+        SetStateOnFailure,
         SleepTime, 
         ConfigChangeMin, 
         ConfigChangeMax, 
@@ -45,6 +47,7 @@ get_env(GenerateNodeName,
                                     end, 
   #er_test_config{raft_nodes            = NewRaftNodes,
                   initial_nodes         = NewInitialNodes,
+                  set_state_on_failure  = SetStateOnFailure,
        		  sleep_time  		= SleepTime,
                   config_change_min     = ConfigChangeMin,
                   config_change_max     = ConfigChangeMax,
@@ -58,6 +61,10 @@ get_raft_nodes(#er_test_config{raft_nodes=Value}) ->
 
 -spec get_initial_nodes(TestConfig :: #er_test_config{}) -> list().
 get_initial_nodes(#er_test_config{initial_nodes=Value}) ->
+  Value.
+
+-spec get_set_state_on_failure(TestConfig :: #er_test_config{}) -> true | false.
+get_set_state_on_failure(#er_test_config{set_state_on_failure=Value}) ->
   Value.
 
 -spec get_sleep_time(TestConfig :: #er_test_config{}) -> non_neg_integer().

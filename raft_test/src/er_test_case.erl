@@ -19,7 +19,8 @@
 -module(er_test_case).
 
 -export([test_case/6,
-         valid_state/1]).
+         valid_state/1, 
+         file_version/1]).
 
 -include("er_fsm.hrl").
 -include("er_test.hrl").
@@ -46,7 +47,7 @@ test_case(TestCaseNo, LeaderId, Config, LogEntries, SleepTime, FullConfig) ->
   case valid_state(TestStatus) of
     true  ->
       lists:foreach(fun(X) -> erlang_raft:log_entry(LeaderState#er_raft_state.leader_id, make_ref(), (TestCaseNo*10000)+X) end, lists:seq(1, LogEntries)),
-      FileVersion = ?BKUP ++ integer_to_list(TestCaseNo),
+      FileVersion = file_version(TestCaseNo),
       FinalStates = erlang_raft_test:copy_state(FullConfig, {false, FileVersion}),
       ConfigStates1 = er_raft_state:get_config_list(FinalStates, Config),
       LeaderState1 = er_raft_state:get_leader_state(ConfigStates1),
@@ -65,6 +66,9 @@ valid_state(#er_test_status{config_state=?ER_VALID_STATE, not_in_config_state=?E
   true;
 valid_state(_) ->
   false.
+
+file_version(TestCaseNo) ->
+  ?BKUP ++ integer_to_list(TestCaseNo).
 
 print(TestCaseNo, Result) ->
   io:fwrite("test_case_no=~p  ~p~n", [TestCaseNo, Result]).

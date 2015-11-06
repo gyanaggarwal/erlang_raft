@@ -32,7 +32,16 @@ run_test(TestCases, AppConfig) ->
   FullConfig = er_test_config:get_raft_nodes(AppConfig),
   InitialNodes = er_test_config:get_initial_nodes(AppConfig),
   SleepTime = er_test_config:get_sleep_time(AppConfig),
-  lists:foldl(fun(X, Acc) -> run_test(X, Acc, FullConfig, InitialNodes, SleepTime) end, #er_test_results{}, TestCases).
+  TestResults = lists:foldl(fun(X, Acc) -> run_test(X, Acc, FullConfig, InitialNodes, SleepTime) end, #er_test_results{}, TestCases),
+  case ((not valid_test_result(TestResults#er_test_results.curr_test_result)) andalso er_test_config:get_set_state_on_failure(AppConfig)) of
+    true  ->
+      FinalState = TestResults#er_test_results.prev_test_result#er_test_result.final_state,
+      FileVersion = er_test_case:file_version(TestResults#er_test_results.prev_test_result#er_test_result.test_case_no),
+      erlang_raft_test:set_state(FullConfig, {FinalState, FileVersion});
+    false ->
+      ok
+  end,
+  TestResults.
   
 run_test(#er_test_scenario{test_case_no=TestCaseNo, leader_status=LeaderStatus, config_change=ConfigChange, log_entries=LogEntries}, 
          #er_test_results{curr_test_result=TestResult}=TestResults, 

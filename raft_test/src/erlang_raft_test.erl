@@ -21,23 +21,24 @@
 -export([get_state/1,
          set_state/2,
          copy_state/2,
-         raft_test/10,
+         raft_test/11,
          raft_test/0,
          test_print/1]).
 
 -include("er_fsm.hrl").
 -include("er_test.hrl").
 
--define(GENERATE_NODE_NAME, true).
--define(RAFT_NODES,         [er_n1, er_n2, er_n3, er_n4, er_n5]).
--define(INITIAL_NODES,      [er_n1, er_n2, er_n3]).
--define(SLEEP_TIME,         5000).
--define(CONFIG_CHANGE_MIN,  50).
--define(CONFIG_CHANGE_MAX,  70).
--define(FULL_CONFIG_CHANGE, 7).
--define(LOG_ENTRIES_MIN,    20).
--define(LOG_ENTRIES_MAX,    50).
--define(RESULT_FILE_NAME,   "raft_test_results.txt").
+-define(GENERATE_NODE_NAME,   true).
+-define(RAFT_NODES,           [er_n1, er_n2, er_n3, er_n4, er_n5]).
+-define(INITIAL_NODES,        [er_n1, er_n2, er_n3]).
+-define(SET_STATE_ON_FAILURE, false).
+-define(SLEEP_TIME,           5000).
+-define(CONFIG_CHANGE_MIN,    50).
+-define(CONFIG_CHANGE_MAX,    70).
+-define(FULL_CONFIG_CHANGE,   7).
+-define(LOG_ENTRIES_MIN,      20).
+-define(LOG_ENTRIES_MAX,      50).
+-define(RESULT_FILE_NAME,     "raft_test_results.txt").
 
 -spec get_state(Nodes :: list()) -> list().
 get_state(Nodes) ->
@@ -57,6 +58,7 @@ copy_state(Nodes, {DeleteRaftData, FileVersion}) ->
 -spec raft_test(GenerateNodeName :: true | false,
                 RaftNodes :: list(),
                 InitialNodes :: list(),
+                SetStateOnFailure :: true | false,
                 SleepTime :: non_neg_integer(),
                 ConfigChangeMin :: non_neg_integer(),
                 ConfigChangeMax :: non_neg_integer(),
@@ -67,6 +69,7 @@ copy_state(Nodes, {DeleteRaftData, FileVersion}) ->
 raft_test(GenerateNodeName,
           RaftNodes,
           InitialNodes,
+          SetStateOnFailure,
       	  SleepTime, 
       	  ConfigChangeMin, 
           ConfigChangeMax, 
@@ -77,6 +80,7 @@ raft_test(GenerateNodeName,
   AppConfig = er_test_config:get_env(GenerateNodeName,
                                      RaftNodes,
                                      InitialNodes,
+                                     SetStateOnFailure,
                                      SleepTime, 
                                      ConfigChangeMin, 
                                      ConfigChangeMax, 
@@ -90,6 +94,7 @@ raft_test() ->
   raft_test(?GENERATE_NODE_NAME,
             ?RAFT_NODES,
             ?INITIAL_NODES,
+            ?SET_STATE_ON_FAILURE,
             ?SLEEP_TIME,
             ?CONFIG_CHANGE_MIN,
             ?CONFIG_CHANGE_MAX,
