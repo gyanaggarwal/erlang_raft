@@ -413,9 +413,14 @@ process_peer_log_entry(#er_append_entries{leader_commit_term=LeaderCommitTerm,
                        State) ->
   case append_log_entry(AppendEntries, State) of
     {ok, NewState} ->
-      NewState1 = NewState#er_raft_state{commit_term=LeaderCommitTerm, commit_index=LeaderCommitIndex},
-      NewState2 = apply_log_entry(NewState1),
-      {?ER_ENTRY_ACCEPTED, NewState2};
+      case acceptable_leader_entry(NewState, AppendEntries) of
+        true  ->
+          NewState1 = NewState#er_raft_state{commit_term=LeaderCommitTerm, commit_index=LeaderCommitIndex},
+          NewState2 = apply_log_entry(NewState1),
+          {?ER_ENTRY_ACCEPTED, NewState2};
+        false ->
+          {?ER_REQUEST_SNAPSHOT, NewState}
+      end;
     Other          ->
       Other
   end.
