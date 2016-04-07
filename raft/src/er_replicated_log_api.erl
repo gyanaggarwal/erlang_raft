@@ -69,7 +69,7 @@ append_entry(Entry) ->
 -spec append_entry_compact(Entry :: #er_log_entry{}, State :: #er_raft_state{}) -> #er_snapshot{} | {error, atom(), status_output()}.
 append_entry_compact(Entry, #er_raft_state{log_entries=LogEntries, applied_term=AppliedTerm, applied_index=AppliedIndex, app_config=AppConfig}) ->
   case append_entry(Entry, ?ER_KEEP_STATUS) of
-    {ok, Status} ->
+    {ok, _Status} ->
       case er_fsm_config:get_log_retention_size(AppConfig) of
         {_, infinity} ->
           #er_snapshot{};

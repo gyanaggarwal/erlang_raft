@@ -1,0 +1,40 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Copyright (c) 2016 Gyanendra Aggarwal.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+{er_state_machine,      [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_app,               	[{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_config,             [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_entry_util,         [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_event,            	[{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_event_handler,      [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_fsm_config,         [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_peer_server,        [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_persist_data,       [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_persist_data_api,	[{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_queue,              [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_raft_peer_api,   	[{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_raft_server,        [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_raft_state,         [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_replicated_log_api, [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_snapshot,           [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_state_machine_api,  [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_sup,                [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_util,               [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{er_vote,               [{i, "../include/"}, {outdir, "../ebin/"}]}.
+{erlang_raft,           [{i, "../include/"}, {outdir, "../ebin/"}]}.
+

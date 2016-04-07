@@ -237,10 +237,17 @@ handle_call(_, _From, State) ->
   event_state("other_call.99", State),
   {reply, Reply, State, get_timeout(Reply, State)}.
   
-handle_cast({?PEER_APPEND_ENTRIES_NOOP, #er_append_entries{leader_info=LeaderInfo}}, #er_raft_state{status=Status}=State) when Status =/= ?ER_LEADER ->
+handle_cast({?PEER_APPEND_ENTRIES_NOOP, 
+	     #er_append_entries{leader_info=LeaderInfo,
+			        leader_commit_term=LeaderCommitTerm,
+			        leader_commit_index=LeaderCommitIndex}}, 
+	     #er_raft_state{status=Status, 
+			    current_term=StateCurrentTerm}=State) when Status =/= ?ER_LEADER andalso LeaderInfo#er_leader_info.leader_term >= StateCurrentTerm ->
   NewState = update_leader_info(LeaderInfo, State),
-  NewState2 = NewState#er_raft_state{status=get_peer_status(NewState#er_raft_state.status)},
-  {noreply, NewState2, get_timeout(?ER_ENTRY_ACCEPTED, NewState2)};
+  NewState1 = NewState#er_raft_state{commit_term=LeaderCommitTerm, commit_index=LeaderCommitIndex},
+  NewState2 = apply_log_entry(NewState1),
+  NewState3 = NewState2#er_raft_state{status=get_peer_status(NewState2#er_raft_state.status)},
+  {noreply, NewState3, get_timeout(?ER_ENTRY_ACCEPTED, NewState3)};
 handle_cast(_, State) ->
   event_state("other_cast.00", State),
   {noreply, State, get_timeout(?ER_ENTRY_ACCEPTED, State)}.
